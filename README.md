@@ -7,6 +7,13 @@ Dual-licensed under MIT or Apache-2.0.
 
 [crates.io](https://crates.io/crates/kuji) | [docs.rs](https://docs.rs/kuji)
 
+## Quickstart
+
+```toml
+[dependencies]
+kuji = "0.1.0"
+```
+
 ```rust
 use kuji::reservoir::ReservoirSampler;
 
@@ -31,4 +38,3 @@ assert_eq!(samples.len(), 5);
 - Gumbel-max trick: classical extreme value sampling identity (often cited via modern ML papers):
   - Jang, Gu, Poole (2017): *Categorical Reparameterization with Gumbel-Softmax*.
   - Maddison, Mnih, Teh (2017): *The Concrete Distribution*.
-

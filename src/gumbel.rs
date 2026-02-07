@@ -1,13 +1,13 @@
 //! Gumbel-max sampling.
 //!
-//! Given logits \( \ell_i \), the Gumbel-max trick samples:
+//! Given logits $\ell_i$, the Gumbel-max trick samples:
 //!
-//! \[
+//! $$
 //! \arg\max_i (\ell_i + g_i), \quad g_i \sim \mathrm{Gumbel}(0, 1)
-//! \]
+//! $$
 //!
 //! This produces a categorical sample with probabilities proportional to
-//! \( \exp(\ell_i) \) (i.e. a softmax distribution) without explicitly
+//! $\exp(\ell_i)$ (i.e. a softmax distribution) without explicitly
 //! computing softmax.
 //!
 //! ## References
@@ -242,4 +242,65 @@ pub fn relaxed_topk_gumbel<R: Rng + ?Sized>(
     }
 
     khot
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    #[test]
+    fn gumbel_topk_basic_invariants() {
+        let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
+        let mut rng = ChaCha8Rng::seed_from_u64(123);
+        let idxs = gumbel_topk_sample_with_rng(&logits, 3, &mut rng);
+
+        assert_eq!(idxs.len(), 3);
+        for &i in &idxs {
+            assert!(i < logits.len());
+        }
+        // Without-replacement selection => unique indices.
+        let mut sorted = idxs.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 3);
+    }
+
+    #[test]
+    fn gumbel_softmax_is_a_probability_vector() {
+        let logits = [1.0_f64, 0.0, -1.0];
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let probs = gumbel_softmax(&logits, 0.7, 1.0, &mut rng);
+
+        assert_eq!(probs.len(), logits.len());
+        assert!(probs.iter().all(|p| p.is_finite() && *p >= 0.0));
+        let sum: f64 = probs.iter().sum();
+        assert!((sum - 1.0).abs() < 1e-9, "sum={sum}");
+    }
+
+    #[test]
+    fn relaxed_topk_sums_to_about_k() {
+        let scores = [0.1_f64, 0.2, 0.3, 0.4, 0.5];
+        let mut rng = ChaCha8Rng::seed_from_u64(9);
+        let k = 2;
+        let khot = relaxed_topk_gumbel(&scores, k, 0.8, 1.0, &mut rng);
+
+        assert_eq!(khot.len(), scores.len());
+        assert!(khot.iter().all(|x| x.is_finite() && *x >= 0.0));
+        let sum: f64 = khot.iter().sum();
+        // It’s a relaxation, not exact k, but should be close-ish for sane temperatures.
+        assert!((sum - k as f64).abs() < 1e-6, "sum={sum}");
+    }
+
+    #[test]
+    fn gumbel_topk_is_deterministic_given_seed() {
+        let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
+        let mut rng1 = ChaCha8Rng::seed_from_u64(42);
+        let mut rng2 = ChaCha8Rng::seed_from_u64(42);
+
+        let a = gumbel_topk_sample_with_rng(&logits, 4, &mut rng1);
+        let b = gumbel_topk_sample_with_rng(&logits, 4, &mut rng2);
+        assert_eq!(a, b);
+    }
 }

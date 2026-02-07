@@ -68,7 +68,9 @@ impl<T> ReservoirSampler<T> {
 
             if self.samples.len() == self.k {
                 // Initial weight for Algorithm L: W = exp(log(u) / k)
-                self.w = (rng.random::<f64>().ln() / self.k as f64).exp();
+                // Clamp away from 0 so W ∈ (0,1) and log(1 - W) stays finite/negative.
+                let u = rng.random::<f64>().max(f64::MIN_POSITIVE);
+                self.w = (u.ln() / self.k as f64).exp();
                 self.update_skip(rng);
             }
             return;
@@ -86,7 +88,8 @@ impl<T> ReservoirSampler<T> {
         self.samples[replace_idx] = item;
 
         // Update W and calculate new skip
-        self.w *= (rng.random::<f64>().ln() / self.k as f64).exp();
+        let u = rng.random::<f64>().max(f64::MIN_POSITIVE);
+        self.w *= (u.ln() / self.k as f64).exp();
         self.update_skip(rng);
     }
 
@@ -294,6 +297,23 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
+    #[derive(Debug, Clone, Default)]
+    struct ZeroRng;
+
+    impl rand::RngCore for ZeroRng {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            dest.fill(0);
+        }
+    }
+
     #[test]
     fn reservoir_keeps_k_items() {
         let mut s = ReservoirSampler::new(5);
@@ -425,5 +445,18 @@ mod tests {
 
         assert!(counts[0] > counts[1]);
         assert!(counts[0] > counts[2]);
+    }
+
+    #[test]
+    fn reservoir_algorithm_l_handles_zero_rng_draws() {
+        // Edge-case: some RNGs (or mocked RNGs) can yield an all-zero stream.
+        // The implementation should not hit ln(0) or log(1 - W)=0 paths.
+        let mut s = ReservoirSampler::new(5);
+        let mut rng = ZeroRng::default();
+        for i in 0..100 {
+            s.add_with_rng(i, &mut rng);
+        }
+        assert_eq!(s.samples().len(), 5);
+        assert_eq!(s.seen(), 100);
     }
 }
