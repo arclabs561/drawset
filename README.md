@@ -89,6 +89,12 @@ Gumbel-top-k single draw (k=10, seed=42): [1, 0, 12, 82, 3, 11, 2, 7, 8, 49]
 cargo test -p kuji
 ```
 
+## See also
+
+- [`innr`](https://crates.io/crates/innr) -- SIMD-accelerated vector similarity primitives
+- [`subsume`](https://crates.io/crates/subsume) -- geometric box embeddings (Gumbel boxes use the same distribution family)
+- [`anno`](https://crates.io/crates/anno) -- information extraction (NER, coreference)
+
 ## References (what these implementations are trying to be faithful to)
 
 - Vitter (1985): reservoir sampling "Algorithm R".
