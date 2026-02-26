@@ -12,6 +12,10 @@
 //! - Vitter (1985): reservoir sampling “Algorithm R”.
 //! - Li (1994): reservoir sampling “Algorithm L” (skip-based).
 //! - Efraimidis & Spirakis (2006): weighted reservoir sampling (A-Res).
+//! - Meligrana & Fazzone (2024): “Weighted Reservoir Sampling With Replacement from
+//!   Data Streams” -- extends A-Res to with-replacement sampling (potential future variant)
+//! - Pettie & Wang (2024): “Universal Perfect Samplers for Incremental Streams” -- exact
+//!   G-samplers using O(1) space for general moment functions
 //!
 //! Notes:
 //! - This module provides `*_with_rng` entrypoints for deterministic testing/benchmarking.

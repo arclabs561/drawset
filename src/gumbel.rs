@@ -10,10 +10,25 @@
 //! $\exp(\ell_i)$ (i.e. a softmax distribution) without explicitly
 //! computing softmax.
 //!
+//! The top-k extension ([`gumbel_topk_sample`]) draws a size-k subset
+//! without replacement by taking the k largest perturbed logits.
+//! This is equivalent to sampling from the **Plackett-Luce** distribution
+//! (Yellott, 1977): the ranking of items by perturbed log-scores
+//! recovers exactly the Plackett-Luce ranking model.
+//!
 //! ## References
 //!
 //! - Jang, Gu, Poole (2017): *Categorical Reparameterization with Gumbel-Softmax*.
 //! - Maddison, Mnih, Teh (2017): *The Concrete Distribution*.
+//! - Huijben et al. (2022): *A Review of the Gumbel-max Trick and its Extensions for
+//!   Discrete Stochasticity in Machine Learning* -- comprehensive taxonomy of Gumbel-max
+//!   variants (top-k, straight-through, truncated).
+//! - Sander et al. (ICML 2023): *Fast, Differentiable and Sparse Top-k: a Convex Analysis
+//!   Perspective* -- convex-analysis alternative to Gumbel-Softmax for differentiable
+//!   top-k selection; avoids the temperature-tuning problem.
+//! - Huang et al. (ACL 2025): *Gumbel Reranking: Differentiable End-to-End Reranking with
+//!   Gumbel-Top-k Sampling for Information Retrieval* -- concrete application of the
+//!   Gumbel-top-k trick for differentiable reranking in neural IR pipelines.
 //!
 //! Notes:
 //! - This module provides `*_with_rng` variants where determinism matters (tests/benches).
@@ -84,6 +99,8 @@ pub fn gumbel_max_sample(logits: &[f32]) -> usize {
 /// Sample k indices without replacement using the Gumbel-top-k trick.
 ///
 /// Returns indices sorted by decreasing perturbed score (deterministic tie-break by index).
+/// The resulting subset is drawn from the Plackett-Luce distribution over size-k subsets,
+/// where each item's inclusion probability is proportional to exp(logit_i).
 ///
 /// # Panics
 ///

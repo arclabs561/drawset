@@ -2,6 +2,13 @@
 //!
 //! Provides utilities for sampling neighbors from a graph, useful for
 //! GNN training (GraphSAGE) and random walks (Node2Vec).
+//!
+//! # References
+//!
+//! - Hamilton et al. (2017): "Inductive Representation Learning on Large Graphs" (GraphSAGE)
+//! - Balaji et al. (2025): "Efficient GNN Training Through Structure-Aware Randomized
+//!   Mini-batching" -- community-aware sampling preserves local graph topology; a future
+//!   direction would combine this with `parti::Leiden` for structure-aware neighbor selection
 
 use rand::prelude::*;
 #[cfg(test)]
