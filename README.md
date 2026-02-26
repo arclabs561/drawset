@@ -89,6 +89,12 @@ Gumbel-top-k single draw (k=10, seed=42): [1, 0, 12, 82, 3, 11, 2, 7, 8, 49]
 cargo test -p kuji
 ```
 
+## Performance
+
+![Benchmark throughput](docs/bench_throughput.png)
+
+*Apple Silicon (NEON). Run `cargo bench` to reproduce on your hardware.*
+
 ## See also
 
 - [`innr`](https://crates.io/crates/innr) -- SIMD-accelerated vector similarity primitives
