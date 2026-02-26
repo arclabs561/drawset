@@ -10,7 +10,7 @@ homepage = "https://github.com/arclabs561/kuji"
 documentation = "https://docs.rs/kuji"
 keywords = ["sampling", "stochastic", "gumbel-softmax", "probability"]
 categories = ["algorithms", "science"]
-include = ["/src/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE-*", "/README.md"]
+include = ["/src/**/*.rs", "/examples/**/*.rs", "/tests/**/*.rs", "/benches/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE-*", "/README.md"]
 
 [dependencies]
 rand = "0.9"

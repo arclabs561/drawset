@@ -46,8 +46,42 @@ assert_eq!(samples.len(), 5);
 
 ## Examples
 
+- `cargo run --example distribution_demo`: ASCII histograms showing uniform vs weighted sampling distributions.
 - `cargo run --example weighted_topk`: compare Gumbel-top-k (Plackett--Luce) vs weighted reservoir
   (A-Res) on the same weight vector.
+- `cargo run --example streaming_reservoir`: stream 1M items through a reservoir of size 100 and verify uniformity.
+
+## Output example
+
+`cargo run --example distribution_demo`:
+
+```text
+Reservoir sampling (Algorithm L) -- uniform stream, k=10:
+  [ 0.. 9] 10057 #######################################
+  [10..19]  9860 ######################################
+  [20..29] 10007 #######################################
+  [30..39] 10021 #######################################
+  [40..49]  9822 ######################################
+  [50..59] 10164 ########################################
+  [60..69] 10111 #######################################
+  [70..79]  9898 ######################################
+  [80..89] 10098 #######################################
+  [90..99]  9962 #######################################
+
+Weighted reservoir (A-Res) -- power-law weights w(i)=1/(1+i)^1.5:
+  [ 0.. 9] 60176 ########################################
+  [10..19] 15999 ##########
+  [20..29]  7687 #####
+  [30..39]  4760 ###
+  [40..49]  3124 ##
+  [50..59]  2415 #
+  [60..69]  1925 #
+  [70..79]  1560 #
+  [80..89]  1252
+  [90..99]  1102
+
+Gumbel-top-k single draw (k=10, seed=42): [1, 0, 12, 82, 3, 11, 2, 7, 8, 49]
+```
 
 ## Tests
 
