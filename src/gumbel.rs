@@ -248,12 +248,30 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
 
 /// Relaxed Top-K via Gumbel-Softmax.
 ///
-/// Implements the “Relaxed Top-K” / “relaxed k-hot” construction:
-/// add one Gumbel perturbation, then iteratively apply a masked softmax \(k\) times,
-/// accumulating a k-hot relaxation (entries sum to approximately \(k\)).
+/// Implements the “Relaxed Top-K” / “relaxed k-hot” construction
+/// (Kool et al., 2019; Xie & Ermon, 2019):
+/// add one Gumbel perturbation, then iteratively apply a masked softmax k times,
+/// accumulating a k-hot relaxation (entries sum to approximately k).
 ///
-/// This is different from taking `max` over `k` independent categorical samples
+/// This is different from taking `max` over k independent categorical samples
 /// (which does not enforce without-replacement top-k structure).
+///
+/// ## Algorithm
+///
+/// 1. Perturb each logit once: `g_i = score_i + Gumbel()`.
+/// 2. For each of the k rounds:
+///    a. **Soft-unmask**: add `log(1 - onehot_i)` to each perturbed logit.
+///       For positions already selected (`onehot_i ~ 1`), this drives the logit
+///       toward `-inf`, suppressing re-selection. For unselected positions
+///       (`onehot_i ~ 0`), the contribution is `log(1) = 0` (no effect).
+///       This is the continuous relaxation of “remove the selected item.”
+///    b. **Softmax**: compute `softmax(g / temperature)` to get the current
+///       soft one-hot vector.
+///    c. **Accumulate**: add the soft one-hot to the running k-hot sum.
+///
+/// The in-place mutation of `scores_gumbel` is intentional: each round's masking
+/// step modifies the perturbed logits so that previously selected elements are
+/// progressively suppressed, yielding a without-replacement structure.
 ///
 /// # Examples
 ///

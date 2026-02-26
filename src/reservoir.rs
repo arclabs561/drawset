@@ -286,6 +286,10 @@ pub struct WeightedReservoirSampler<T> {
     seen: usize,
     items: Vec<T>,
     keys: Vec<f64>,
+    /// Cached index of the minimum key. Avoids O(k) scan on every insertion
+    /// after the reservoir is full; only rescanned when the min element is
+    /// actually replaced.
+    min_idx: usize,
 }
 
 impl<T> WeightedReservoirSampler<T> {
@@ -296,6 +300,7 @@ impl<T> WeightedReservoirSampler<T> {
             seen: 0,
             items: Vec::with_capacity(k),
             keys: Vec::with_capacity(k),
+            min_idx: 0,
         }
     }
 
@@ -344,23 +349,25 @@ impl<T> WeightedReservoirSampler<T> {
         let key = (u.ln() / weight).exp();
 
         if self.items.len() < self.k {
+            // Track min during the fill phase.
+            if self.keys.is_empty() || key < self.keys[self.min_idx] {
+                self.min_idx = self.items.len();
+            }
             self.items.push(item);
             self.keys.push(key);
             return Ok(());
         }
 
-        let mut min_idx = 0usize;
-        let mut min_key = self.keys[0];
-        for (i, &k_i) in self.keys.iter().enumerate().skip(1) {
-            if k_i < min_key {
-                min_key = k_i;
-                min_idx = i;
+        if key > self.keys[self.min_idx] {
+            self.items[self.min_idx] = item;
+            self.keys[self.min_idx] = key;
+            // Rescan for new min only when an element was replaced.
+            self.min_idx = 0;
+            for (i, &k_i) in self.keys.iter().enumerate().skip(1) {
+                if k_i < self.keys[self.min_idx] {
+                    self.min_idx = i;
+                }
             }
-        }
-
-        if key > min_key {
-            self.items[min_idx] = item;
-            self.keys[min_idx] = key;
         }
 
         Ok(())
