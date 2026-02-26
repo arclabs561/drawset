@@ -68,12 +68,31 @@ pub fn gumbel_noise<R: Rng + ?Sized>(rng: &mut R) -> f64 {
 ///
 /// # Examples
 ///
+/// Sample from a categorical distribution over four classes. Higher
+/// logits correspond to higher selection probability, but any index
+/// can be drawn.
+///
 /// ```
 /// use kuji::gumbel_max_sample;
 ///
 /// let logits = [0.0_f32, 1.0, 2.0, 3.0];
 /// let idx = gumbel_max_sample(&logits);
 /// assert!(idx < logits.len());
+/// ```
+///
+/// Repeated draws are stochastic -- the index with the largest logit
+/// (here index 3) is most likely, but not guaranteed on any single call:
+///
+/// ```
+/// use kuji::gumbel_max_sample;
+///
+/// let logits = [0.0_f32, -1.0, 5.0]; // index 2 is strongly favoured
+/// let mut counts = [0u32; 3];
+/// for _ in 0..200 {
+///     counts[gumbel_max_sample(&logits)] += 1;
+/// }
+/// // Index 2 should win the majority of draws.
+/// assert!(counts[2] > counts[0] && counts[2] > counts[1]);
 /// ```
 pub fn gumbel_max_sample(logits: &[f32]) -> usize {
     assert!(
