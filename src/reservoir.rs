@@ -635,6 +635,50 @@ mod tests {
         assert!(matches!(err, WeightedReservoirError::NonFiniteWeight(w) if w.is_infinite()));
     }
 
+    // =========================================================================
+    // Property tests
+    // =========================================================================
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        // ---- A-Res cached min_idx is correct after every add ----
+        proptest! {
+            #[test]
+            fn prop_weighted_reservoir_min_idx_correct(
+                seed in 0u64..10_000,
+                k in 1usize..=10,
+                n in 1usize..=50,
+                weights in proptest::collection::vec(0.01f64..100.0f64, 1..=50),
+            ) {
+                let n = n.min(weights.len());
+                let mut sampler = WeightedReservoirSampler::new(k);
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+                for i in 0..n {
+                    sampler.add_with_rng(i, weights[i], &mut rng).unwrap();
+
+                    // After each add, if the reservoir has items, min_idx should be correct.
+                    if !sampler.keys.is_empty() {
+                        let actual_min_idx = sampler.keys.iter()
+                            .enumerate()
+                            .min_by(|(_, a), (_, b)| a.total_cmp(b))
+                            .unwrap()
+                            .0;
+                        prop_assert!(
+                            sampler.min_idx == actual_min_idx,
+                            "After adding item {}: cached min_idx={} but actual min is at {}. keys={:?}",
+                            i, sampler.min_idx, actual_min_idx, sampler.keys
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn algorithm_l_and_r_agree_on_size() {
         let k = 10;

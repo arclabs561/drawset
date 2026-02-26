@@ -511,6 +511,76 @@ mod tests {
         assert_eq!(khot, vec![1.0; 2]);
     }
 
+    // =========================================================================
+    // Property tests
+    // =========================================================================
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        // ---- Gumbel softmax at very low temperature concentrates on max logit ----
+        // We ensure the max logit has a clear gap (>= 3.0) over the rest,
+        // so that at T=0.01 the Gumbel noise cannot flip the ranking.
+        proptest! {
+            #[test]
+            fn prop_gumbel_softmax_low_temp_concentrates(
+                seed in 0u64..5_000,
+                base_logits in proptest::collection::vec(-5.0f64..5.0f64, 2..=8),
+            ) {
+                // Create logits where the first element is guaranteed to be
+                // the max by adding a large gap to the current max.
+                let current_max = base_logits.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let mut logits = base_logits;
+                logits[0] = current_max + 5.0; // clear gap of 5.0
+                let max_idx = 0;
+
+                // At very low temperature, the mass should be concentrated.
+                let n_trials = 50;
+                let mut mass_at_max = 0.0;
+                for t in 0..n_trials {
+                    let mut rng = ChaCha8Rng::seed_from_u64(seed * 1000 + t);
+                    let probs = gumbel_softmax(&logits, 0.01, 1.0, &mut rng);
+                    mass_at_max += probs[max_idx];
+                }
+                let avg_mass = mass_at_max / n_trials as f64;
+
+                // With a gap of 3.0 at T=0.01, the dominant logit should
+                // capture nearly all mass on average.
+                prop_assert!(
+                    avg_mass > 0.9,
+                    "At low T, max-logit idx={max_idx} got avg mass={avg_mass:.4}, logits={logits:?}"
+                );
+            }
+        }
+
+        // ---- relaxed_topk sum is approximately k ----
+        proptest! {
+            #[test]
+            fn prop_relaxed_topk_sum_is_k(
+                seed in 0u64..5_000,
+                scores in proptest::collection::vec(-5.0f64..5.0f64, 3..=10),
+                k in 1usize..=3,
+                temp in 0.1f64..2.0f64,
+            ) {
+                prop_assume!(k < scores.len());
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+                let khot = relaxed_topk_gumbel(&scores, k, temp, 1.0, &mut rng);
+
+                prop_assert_eq!(khot.len(), scores.len());
+                prop_assert!(khot.iter().all(|x| x.is_finite() && *x >= 0.0));
+
+                let sum: f64 = khot.iter().sum();
+                prop_assert!(
+                    (sum - k as f64).abs() < 1e-5,
+                    "relaxed_topk sum={sum}, expected {k}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn relaxed_topk_zero_temperature_falls_back_to_hard_khot() {
         let mut rng = ChaCha8Rng::seed_from_u64(55);
