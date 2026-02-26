@@ -21,6 +21,22 @@ use rand::prelude::*;
 /// A reservoir sampler that maintains a uniform sample of size `k` from a stream.
 ///
 /// Uses **Algorithm L** (Li, 1994) for O(k(1 + log(N/k))) complexity.
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::ReservoirSampler;
+///
+/// let mut sampler = ReservoirSampler::new(3);
+/// let mut rng = ChaCha8Rng::seed_from_u64(42);
+/// for i in 0..100 {
+///     sampler.add_with_rng(i, &mut rng);
+/// }
+/// assert_eq!(sampler.samples().len(), 3);
+/// assert_eq!(sampler.seen(), 100);
+/// ```
 #[derive(Debug, Clone)]
 pub struct ReservoirSampler<T> {
     k: usize,
@@ -45,6 +61,18 @@ impl<T> ReservoirSampler<T> {
     /// Add an item from the stream.
     ///
     /// If `k == 0`, this discards all items.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use kuji::ReservoirSampler;
+    ///
+    /// let mut sampler = ReservoirSampler::new(2);
+    /// sampler.add("alpha");
+    /// sampler.add("beta");
+    /// sampler.add("gamma");
+    /// assert!(sampler.samples().len() <= 2);
+    /// ```
     #[inline]
     pub fn add(&mut self, item: T) {
         let mut rng = rand::rng();
@@ -54,6 +82,21 @@ impl<T> ReservoirSampler<T> {
     /// Add an item from the stream, using a caller-supplied RNG.
     ///
     /// This exists primarily for deterministic testing/benchmarking.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rand::SeedableRng;
+    /// use rand_chacha::ChaCha8Rng;
+    /// use kuji::ReservoirSampler;
+    ///
+    /// let mut sampler = ReservoirSampler::new(5);
+    /// let mut rng = ChaCha8Rng::seed_from_u64(0);
+    /// for i in 0..50 {
+    ///     sampler.add_with_rng(i, &mut rng);
+    /// }
+    /// assert_eq!(sampler.samples().len(), 5);
+    /// ```
     #[inline]
     pub fn add_with_rng<R: Rng + ?Sized>(&mut self, item: T, rng: &mut R) {
         self.seen += 1;
@@ -122,6 +165,22 @@ impl<T> ReservoirSampler<T> {
 ///
 /// This is the classic O(N) baseline. It is useful as a correctness reference
 /// and for comparisons against Algorithm L.
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::ReservoirSamplerR;
+///
+/// let mut sampler = ReservoirSamplerR::new(3);
+/// let mut rng = ChaCha8Rng::seed_from_u64(42);
+/// for i in 0..100 {
+///     sampler.add_with_rng(i, &mut rng);
+/// }
+/// assert_eq!(sampler.samples().len(), 3);
+/// assert_eq!(sampler.seen(), 100);
+/// ```
 #[derive(Debug, Clone)]
 pub struct ReservoirSamplerR<T> {
     k: usize,
@@ -198,10 +257,25 @@ impl std::fmt::Display for WeightedReservoirError {
 
 impl std::error::Error for WeightedReservoirError {}
 
-/// A weighted reservoir sampler (Efraimidis–Spirakis, A-Res).
+/// A weighted reservoir sampler (Efraimidis-Spirakis, A-Res).
 ///
 /// Each item with weight `w_i` gets a key `u^(1/w_i)` where `u ~ Uniform(0,1)`.
 /// Keep the top-k keys.
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::WeightedReservoirSampler;
+///
+/// let mut sampler = WeightedReservoirSampler::new(2);
+/// let mut rng = ChaCha8Rng::seed_from_u64(42);
+/// sampler.add_with_rng("a", 10.0, &mut rng).unwrap();
+/// sampler.add_with_rng("b", 1.0, &mut rng).unwrap();
+/// sampler.add_with_rng("c", 1.0, &mut rng).unwrap();
+/// assert_eq!(sampler.samples().len(), 2);
+/// ```
 #[derive(Debug, Clone)]
 pub struct WeightedReservoirSampler<T> {
     k: usize,
@@ -229,6 +303,19 @@ impl<T> WeightedReservoirSampler<T> {
     }
 
     /// Add a weighted item using a caller-supplied RNG.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use rand::SeedableRng;
+    /// use rand_chacha::ChaCha8Rng;
+    /// use kuji::WeightedReservoirSampler;
+    ///
+    /// let mut sampler = WeightedReservoirSampler::new(1);
+    /// let mut rng = ChaCha8Rng::seed_from_u64(0);
+    /// sampler.add_with_rng(42, 5.0, &mut rng).unwrap();
+    /// assert_eq!(sampler.samples(), &[42]);
+    /// ```
     #[inline]
     pub fn add_with_rng<R: Rng + ?Sized>(
         &mut self,
@@ -452,11 +539,106 @@ mod tests {
         // Edge-case: some RNGs (or mocked RNGs) can yield an all-zero stream.
         // The implementation should not hit ln(0) or log(1 - W)=0 paths.
         let mut s = ReservoirSampler::new(5);
-        let mut rng = ZeroRng::default();
+        let mut rng = ZeroRng;
         for i in 0..100 {
             s.add_with_rng(i, &mut rng);
         }
         assert_eq!(s.samples().len(), 5);
         assert_eq!(s.seen(), 100);
+    }
+
+    // --- edge case tests ---
+
+    #[test]
+    fn reservoir_k_zero_discards_everything() {
+        let mut s = ReservoirSampler::new(0);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        for i in 0..100 {
+            s.add_with_rng(i, &mut rng);
+        }
+        assert!(s.samples().is_empty());
+        assert_eq!(s.seen(), 100);
+    }
+
+    #[test]
+    fn reservoir_k_larger_than_stream_returns_all() {
+        let mut s = ReservoirSampler::new(50);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        for i in 0..10 {
+            s.add_with_rng(i, &mut rng);
+        }
+        assert_eq!(s.samples().len(), 10);
+        let mut sorted: Vec<_> = s.samples().to_vec();
+        sorted.sort_unstable();
+        assert_eq!(sorted, (0..10).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn reservoir_r_k_zero_discards_everything() {
+        let mut s = ReservoirSamplerR::new(0);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        for i in 0..100 {
+            s.add_with_rng(i, &mut rng);
+        }
+        assert!(s.samples().is_empty());
+        assert_eq!(s.seen(), 100);
+    }
+
+    #[test]
+    fn reservoir_r_k_larger_than_stream_returns_all() {
+        let mut s = ReservoirSamplerR::new(50);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        for i in 0..10 {
+            s.add_with_rng(i, &mut rng);
+        }
+        assert_eq!(s.samples().len(), 10);
+        let mut sorted: Vec<_> = s.samples().to_vec();
+        sorted.sort_unstable();
+        assert_eq!(sorted, (0..10).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn weighted_reservoir_k_zero_discards_everything() {
+        let mut s = WeightedReservoirSampler::new(0);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        for i in 0..100 {
+            s.add_with_rng(i, 1.0, &mut rng).unwrap();
+        }
+        assert!(s.samples().is_empty());
+        assert_eq!(s.seen(), 100);
+    }
+
+    #[test]
+    fn weighted_reservoir_negative_weight_error() {
+        let mut s = WeightedReservoirSampler::new(5);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let err = s.add_with_rng(1, -1.0, &mut rng).unwrap_err();
+        assert_eq!(err, WeightedReservoirError::NonPositiveWeight(-1.0));
+    }
+
+    #[test]
+    fn weighted_reservoir_infinity_weight_error() {
+        let mut s = WeightedReservoirSampler::new(5);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let err = s.add_with_rng(1, f64::INFINITY, &mut rng).unwrap_err();
+        assert!(matches!(err, WeightedReservoirError::NonFiniteWeight(w) if w.is_infinite()));
+    }
+
+    #[test]
+    fn algorithm_l_and_r_agree_on_size() {
+        let k = 10;
+        let n = 200;
+        let mut s_l = ReservoirSampler::new(k);
+        let mut s_r = ReservoirSamplerR::new(k);
+        let mut rng_l = ChaCha8Rng::seed_from_u64(99);
+        let mut rng_r = ChaCha8Rng::seed_from_u64(99);
+        for i in 0..n {
+            s_l.add_with_rng(i, &mut rng_l);
+            s_r.add_with_rng(i, &mut rng_r);
+        }
+        assert_eq!(s_l.samples().len(), k);
+        assert_eq!(s_r.samples().len(), k);
+        assert_eq!(s_l.seen(), n);
+        assert_eq!(s_r.seen(), n);
     }
 }

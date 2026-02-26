@@ -30,11 +30,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // A-Res requires w>0.
         rs.add_with_rng(i, w, &mut rng_r)?;
     }
-    let pick_r: Vec<usize> = rs.samples().iter().copied().collect();
+    let pick_r: Vec<usize> = rs.samples().to_vec();
 
     println!("weights[0..10]:");
-    for i in 0..10 {
-        println!("  i={i:2}  w={:.6}", weights[i]);
+    for (i, w) in weights.iter().enumerate().take(10) {
+        println!("  i={i:2}  w={w:.6}");
     }
     println!();
     println!("gumbel-top-k (Plackett–Luce) indices: {pick_g:?}");

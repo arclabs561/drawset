@@ -26,6 +26,18 @@ use rand::prelude::*;
 ///
 /// Used in the Gumbel-Max trick for categorical sampling and Gumbel-Softmax
 /// for differentiable sampling.
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::gumbel_noise;
+///
+/// let mut rng = ChaCha8Rng::seed_from_u64(42);
+/// let g = gumbel_noise(&mut rng);
+/// assert!(g.is_finite());
+/// ```
 pub fn gumbel_noise<R: Rng + ?Sized>(rng: &mut R) -> f64 {
     let u: f64 = rng.random_range(0.0..1.0);
     // Clamp to avoid log(0)
@@ -38,6 +50,16 @@ pub fn gumbel_noise<R: Rng + ?Sized>(rng: &mut R) -> f64 {
 /// # Panics
 ///
 /// Panics if `logits` is empty.
+///
+/// # Examples
+///
+/// ```
+/// use kuji::gumbel_max_sample;
+///
+/// let logits = [0.0_f32, 1.0, 2.0, 3.0];
+/// let idx = gumbel_max_sample(&logits);
+/// assert!(idx < logits.len());
+/// ```
 pub fn gumbel_max_sample(logits: &[f32]) -> usize {
     assert!(
         !logits.is_empty(),
@@ -66,12 +88,39 @@ pub fn gumbel_max_sample(logits: &[f32]) -> usize {
 /// # Panics
 ///
 /// Panics if `logits` is empty or if `k == 0` or `k > logits.len()`.
+///
+/// # Examples
+///
+/// ```
+/// use kuji::gumbel_topk_sample;
+///
+/// let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
+/// let indices = gumbel_topk_sample(&logits, 3);
+/// assert_eq!(indices.len(), 3);
+/// // All indices are valid and unique.
+/// for &i in &indices {
+///     assert!(i < logits.len());
+/// }
+/// ```
 pub fn gumbel_topk_sample(logits: &[f32], k: usize) -> Vec<usize> {
     let mut rng = rand::rng();
     gumbel_topk_sample_with_rng(logits, k, &mut rng)
 }
 
 /// Gumbel-top-k with a caller-supplied RNG (for tests/benchmarks).
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::gumbel_topk_sample_with_rng;
+///
+/// let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
+/// let mut rng = ChaCha8Rng::seed_from_u64(99);
+/// let indices = gumbel_topk_sample_with_rng(&logits, 2, &mut rng);
+/// assert_eq!(indices.len(), 2);
+/// ```
 pub fn gumbel_topk_sample_with_rng<R: Rng + ?Sized>(
     logits: &[f32],
     k: usize,
@@ -100,7 +149,25 @@ pub fn gumbel_topk_sample_with_rng<R: Rng + ?Sized>(
 /// Gumbel-Softmax: differentiable approximation to categorical sampling.
 ///
 /// Returns a soft one-hot vector that approaches a hard one-hot as
-/// temperature → 0.
+/// temperature -> 0.
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::gumbel_softmax;
+///
+/// let logits = [1.0_f64, 0.0, -1.0];
+/// let mut rng = ChaCha8Rng::seed_from_u64(7);
+/// let probs = gumbel_softmax(&logits, 0.7, 1.0, &mut rng);
+///
+/// // Result is a probability vector: non-negative, sums to 1.
+/// assert_eq!(probs.len(), 3);
+/// assert!(probs.iter().all(|p| *p >= 0.0 && p.is_finite()));
+/// let sum: f64 = probs.iter().sum();
+/// assert!((sum - 1.0).abs() < 1e-9);
+/// ```
 pub fn gumbel_softmax<R: Rng + ?Sized>(
     logits: &[f64],
     temperature: f64,
@@ -170,6 +237,25 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
 ///
 /// This is different from taking `max` over `k` independent categorical samples
 /// (which does not enforce without-replacement top-k structure).
+///
+/// # Examples
+///
+/// ```
+/// use rand::SeedableRng;
+/// use rand_chacha::ChaCha8Rng;
+/// use kuji::relaxed_topk_gumbel;
+///
+/// let scores = [0.1_f64, 0.2, 0.3, 0.4, 0.5];
+/// let mut rng = ChaCha8Rng::seed_from_u64(9);
+/// let khot = relaxed_topk_gumbel(&scores, 2, 0.8, 1.0, &mut rng);
+///
+/// // Result has same length as input and entries are non-negative.
+/// assert_eq!(khot.len(), 5);
+/// assert!(khot.iter().all(|x| *x >= 0.0 && x.is_finite()));
+/// // Entries sum to approximately k=2.
+/// let sum: f64 = khot.iter().sum();
+/// assert!((sum - 2.0).abs() < 1e-6);
+/// ```
 pub fn relaxed_topk_gumbel<R: Rng + ?Sized>(
     scores: &[f64],
     k: usize,
@@ -302,5 +388,110 @@ mod tests {
         let a = gumbel_topk_sample_with_rng(&logits, 4, &mut rng1);
         let b = gumbel_topk_sample_with_rng(&logits, 4, &mut rng2);
         assert_eq!(a, b);
+    }
+
+    // --- edge case tests ---
+
+    #[test]
+    fn gumbel_noise_returns_finite() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        for _ in 0..1_000 {
+            let g = gumbel_noise(&mut rng);
+            assert!(g.is_finite(), "gumbel_noise produced non-finite: {g}");
+        }
+    }
+
+    #[test]
+    fn gumbel_max_sample_single_logit_returns_zero() {
+        let idx = gumbel_max_sample(&[42.0_f32]);
+        assert_eq!(idx, 0);
+    }
+
+    #[test]
+    fn gumbel_topk_k_equals_n_returns_permutation() {
+        let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
+        let mut rng = ChaCha8Rng::seed_from_u64(77);
+        let idxs = gumbel_topk_sample_with_rng(&logits, logits.len(), &mut rng);
+        assert_eq!(idxs.len(), logits.len());
+        let mut sorted = idxs.clone();
+        sorted.sort_unstable();
+        assert_eq!(
+            sorted,
+            vec![0, 1, 2, 3, 4],
+            "k=n must return a permutation of all indices"
+        );
+    }
+
+    #[test]
+    fn gumbel_softmax_empty_logits_returns_empty() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let probs = gumbel_softmax(&[], 1.0, 1.0, &mut rng);
+        assert!(probs.is_empty());
+    }
+
+    #[test]
+    fn gumbel_softmax_single_logit_returns_one() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let probs = gumbel_softmax(&[5.0], 1.0, 1.0, &mut rng);
+        assert_eq!(probs, vec![1.0]);
+    }
+
+    #[test]
+    fn gumbel_softmax_zero_temperature_falls_back_to_hard() {
+        let mut rng = ChaCha8Rng::seed_from_u64(11);
+        let probs = gumbel_softmax(&[1.0, 2.0, 3.0], 0.0, 1.0, &mut rng);
+        assert_eq!(probs.len(), 3);
+        // Exactly one entry is 1.0, others are 0.0 (hard one-hot).
+        let ones: Vec<_> = probs.iter().filter(|&&p| p == 1.0).collect();
+        let zeros: Vec<_> = probs.iter().filter(|&&p| p == 0.0).collect();
+        assert_eq!(ones.len(), 1);
+        assert_eq!(zeros.len(), 2);
+    }
+
+    #[test]
+    fn gumbel_softmax_nan_temperature_falls_back_to_hard() {
+        let mut rng = ChaCha8Rng::seed_from_u64(11);
+        let probs = gumbel_softmax(&[1.0, 2.0, 3.0], f64::NAN, 1.0, &mut rng);
+        assert_eq!(probs.len(), 3);
+        let ones: Vec<_> = probs.iter().filter(|&&p| p == 1.0).collect();
+        let zeros: Vec<_> = probs.iter().filter(|&&p| p == 0.0).collect();
+        assert_eq!(ones.len(), 1);
+        assert_eq!(zeros.len(), 2);
+    }
+
+    #[test]
+    fn relaxed_topk_k_zero_returns_empty() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let khot = relaxed_topk_gumbel(&[1.0, 2.0, 3.0], 0, 1.0, 1.0, &mut rng);
+        assert!(khot.is_empty());
+    }
+
+    #[test]
+    fn relaxed_topk_k_ge_n_returns_all_ones() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+        let khot = relaxed_topk_gumbel(&[1.0, 2.0, 3.0], 3, 1.0, 1.0, &mut rng);
+        assert_eq!(khot, vec![1.0; 3]);
+
+        let khot = relaxed_topk_gumbel(&[1.0, 2.0], 5, 1.0, 1.0, &mut rng);
+        assert_eq!(khot, vec![1.0; 2]);
+    }
+
+    #[test]
+    fn relaxed_topk_zero_temperature_falls_back_to_hard_khot() {
+        let mut rng = ChaCha8Rng::seed_from_u64(55);
+        let khot = relaxed_topk_gumbel(&[1.0, 2.0, 3.0, 4.0, 5.0], 2, 0.0, 1.0, &mut rng);
+        assert_eq!(khot.len(), 5);
+        // Exactly k=2 entries are 1.0, the rest are 0.0.
+        let sum: f64 = khot.iter().sum();
+        assert!(
+            (sum - 2.0).abs() < 1e-12,
+            "hard k-hot should sum to exactly k, got {sum}"
+        );
+        for &x in &khot {
+            assert!(
+                x == 0.0 || x == 1.0,
+                "hard k-hot entry should be 0 or 1, got {x}"
+            );
+        }
     }
 }

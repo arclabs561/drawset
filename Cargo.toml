@@ -1,16 +1,21 @@
 [package]
 name = "kuji"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+rust-version = "1.75"
 description = "Stochastic sampling primitives: Gumbel-Softmax, reservoir sampling, and latent permutations"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/arclabs561/kuji"
 homepage = "https://github.com/arclabs561/kuji"
 documentation = "https://docs.rs/kuji"
 keywords = ["sampling", "stochastic", "gumbel-softmax", "probability"]
+include = ["/src/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE-*", "/README.md"]
 
 [dependencies]
 rand = "0.9"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dev-dependencies]
 rand_chacha = "0.9"

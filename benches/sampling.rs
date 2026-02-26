@@ -1,4 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
+
+use criterion::{criterion_group, criterion_main, Criterion};
 use kuji::reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
 use kuji::{gumbel_max_sample, gumbel_topk_sample};
 
