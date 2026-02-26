@@ -5,7 +5,7 @@
 [![CI](https://github.com/arclabs561/kuji/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/kuji/actions/workflows/ci.yml)
 
 Stochastic sampling primitives for unbiased data selection and stream processing.
-Implements reservoir sampling (Algorithm L/R), weighted sampling, and Gumbel-max for top-k.
+Implements Gumbel-max top-k, Gumbel-Softmax relaxations, reservoir sampling (Algorithm L/R), and weighted reservoir (A-Res).
 
 Dual-licensed under MIT or Apache-2.0.
 
@@ -15,7 +15,7 @@ Dual-licensed under MIT or Apache-2.0.
 
 ```toml
 [dependencies]
-kuji = "0.1.1"
+kuji = "0.1.2"
 ```
 
 ```rust
@@ -37,10 +37,12 @@ assert_eq!(samples.len(), 5);
 | `gumbel_topk_sample` | Top-k without replacement via Gumbel perturbation |
 | `gumbel_softmax` | Differentiable categorical approximation |
 | `relaxed_topk_gumbel` | Relaxed k-hot via iterated Gumbel-Softmax |
-| `ReservoirSampler` | Algorithm L (Li, 1994) -- O(k log(N/k)) |
+| `ReservoirSampler` | Algorithm L (Li, 1994) -- O(k(1 + log(N/k))) |
 | `ReservoirSamplerR` | Algorithm R (Vitter, 1985) -- O(N) baseline |
 | `WeightedReservoirSampler` | A-Res (Efraimidis & Spirakis, 2006) |
 | `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
+
+**vs `rand`**: `rand::seq` provides uniform sampling but not reservoir sampling over streams, weighted reservoir (A-Res), or Gumbel-max top-k.
 
 ## Examples
 
