@@ -15,7 +15,7 @@ Dual-licensed under MIT or Apache-2.0.
 
 ```toml
 [dependencies]
-kuji = "0.1.3"
+kuji = "0.1.5"
 ```
 
 ```rust
@@ -95,12 +95,6 @@ cargo test -p kuji
 
 *Apple Silicon (NEON). Run `cargo bench` to reproduce on your hardware.*
 
-## See also
-
-- [`innr`](https://crates.io/crates/innr) -- SIMD-accelerated vector similarity primitives
-- [`subsume`](https://crates.io/crates/subsume) -- geometric box embeddings (Gumbel boxes use the same distribution family)
-- [`anno`](https://crates.io/crates/anno) -- information extraction (NER, coreference)
-
 ## References (what these implementations are trying to be faithful to)
 
 - Vitter (1985): reservoir sampling "Algorithm R".
@@ -109,3 +103,7 @@ cargo test -p kuji
 - Gumbel-max trick: classical extreme value sampling identity (often cited via modern ML papers):
   - Jang, Gu, Poole (2017): *Categorical Reparameterization with Gumbel-Softmax*.
   - Maddison, Mnih, Teh (2017): *The Concrete Distribution*.
+
+## License
+
+MIT OR Apache-2.0
