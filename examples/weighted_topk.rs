@@ -19,9 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A weight vector shaped like PPR (personalized PageRank) scores:
     // many small weights, few large ones.
     let n = 20;
-    let weights: Vec<f64> = (0..n)
-        .map(|i| 1.0 / (1.0 + (i as f64)).powf(1.3))
-        .collect();
+    let weights: Vec<f64> = (0..n).map(|i| 1.0 / (1.0 + (i as f64)).powf(1.3)).collect();
 
     let eps = 1e-12f64;
     let logits: Vec<f32> = weights.iter().map(|&w| (w + eps).ln() as f32).collect();

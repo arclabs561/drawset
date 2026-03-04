@@ -100,6 +100,10 @@ fn main() {
     }
 
     println!();
-    println!("Chi-squared statistic: {chi2:.2} (df={}, expect ~{})", n_buckets - 1, n_buckets - 1);
+    println!(
+        "Chi-squared statistic: {chi2:.2} (df={}, expect ~{})",
+        n_buckets - 1,
+        n_buckets - 1
+    );
     println!("Ratios near 1.0 confirm uniform sampling across the stream.");
 }

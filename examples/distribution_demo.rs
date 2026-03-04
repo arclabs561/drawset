@@ -40,7 +40,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             buckets[v / (N / BUCKETS)] += 1;
         }
     }
-    histogram(&buckets, "Reservoir sampling (Algorithm L) -- uniform stream, k=10:");
+    histogram(
+        &buckets,
+        "Reservoir sampling (Algorithm L) -- uniform stream, k=10:",
+    );
 
     // --- 2. Weighted reservoir (A-Res) with power-law weights ---
     let weights: Vec<f64> = (0..N).map(|i| 1.0 / (1.0 + i as f64).powf(1.5)).collect();
