@@ -9,6 +9,7 @@
 //! - `neighbor`: simple neighborhood sampling helpers (useful for graph ML).
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 pub mod gumbel;
 pub mod neighbor;
