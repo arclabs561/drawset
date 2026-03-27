@@ -70,8 +70,14 @@ fn radical_inverse(mut index: u64, base: u64) -> f64 {
 /// assert!((p[2] - 0.2).abs() < 1e-12);
 /// ```
 pub fn halton_point(index: usize, d: usize) -> Vec<f64> {
-    assert!(d <= PRIMES.len(), "Halton supports at most {} dimensions", PRIMES.len());
-    (0..d).map(|j| radical_inverse(index as u64, PRIMES[j])).collect()
+    assert!(
+        d <= PRIMES.len(),
+        "Halton supports at most {} dimensions",
+        PRIMES.len()
+    );
+    (0..d)
+        .map(|j| radical_inverse(index as u64, PRIMES[j]))
+        .collect()
 }
 
 /// Generate `n` Halton points in `[0, 1)^d`, starting from `index = 1`.
@@ -215,7 +221,10 @@ impl SobolGenerator {
     /// Panics if `dim` is 0 or exceeds 8.
     pub fn new(dim: usize) -> Self {
         assert!(dim > 0, "dimension must be >= 1");
-        assert!(dim <= 8, "Sobol supports at most 8 dimensions (embedded table)");
+        assert!(
+            dim <= 8,
+            "Sobol supports at most 8 dimensions (embedded table)"
+        );
         let v = build_direction_numbers(dim);
         Self {
             dim,
@@ -491,7 +500,10 @@ mod tests {
         let b = sobol_scrambled(16, 2, 2);
         // At least some points should differ.
         let diffs = a.iter().zip(&b).filter(|(pa, pb)| pa != pb).count();
-        assert!(diffs > 0, "different seeds should produce different sequences");
+        assert!(
+            diffs > 0,
+            "different seeds should produce different sequences"
+        );
     }
 
     #[test]
@@ -516,10 +528,7 @@ mod tests {
 
         // MC estimate (Halton as a simpler stand-in -- still QMC but independent).
         // For a true comparison, use pseudorandom, but we just verify QMC is close.
-        assert!(
-            qmc_err < 5e-4,
-            "QMC integration error too large: {qmc_err}"
-        );
+        assert!(qmc_err < 5e-4, "QMC integration error too large: {qmc_err}");
     }
 
     #[test]

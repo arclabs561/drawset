@@ -22,4 +22,5 @@ pub use gumbel::{
     gumbel_topk_sample_with_rng, relaxed_topk_gumbel,
 };
 pub use neighbor::NeighborSampler;
+pub use qmc::{halton_point, halton_sequence, sobol_scrambled, sobol_sequence, SobolGenerator};
 pub use reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
