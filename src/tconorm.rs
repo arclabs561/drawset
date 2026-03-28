@@ -204,7 +204,7 @@ mod tests {
                 for &b in &[0.0, 0.25, 0.5, 0.75, 1.0] {
                     let r = tconorm(f, a, b);
                     assert!(
-                        r >= -1e-10 && r <= 1.0 + 1e-10,
+                        (-1e-10..=1.0 + 1e-10).contains(&r),
                         "{f:?}: S({a},{b}) = {r} out of [0,1]"
                     );
                 }

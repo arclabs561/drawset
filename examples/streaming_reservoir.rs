@@ -87,15 +87,15 @@ fn main() {
     println!("{}", "-".repeat(50));
 
     let mut chi2: f64 = 0.0;
-    for b in 0..n_buckets {
+    for (b, &bc) in bucket_counts.iter().enumerate().take(n_buckets) {
         let lo = b * bucket_size;
         let hi = lo + bucket_size - 1;
-        let count = bucket_counts[b] as f64;
+        let count = bc as f64;
         let ratio = count / expected_per_bucket;
         chi2 += (count - expected_per_bucket).powi(2) / expected_per_bucket;
         println!(
             "{:>6}..{:<5} {:>12} {:>12.0} {:>10.4}",
-            lo, hi, bucket_counts[b], expected_per_bucket, ratio
+            lo, hi, bc, expected_per_bucket, ratio
         );
     }
 

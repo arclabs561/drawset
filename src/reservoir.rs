@@ -658,8 +658,8 @@ mod tests {
                 let mut sampler = WeightedReservoirSampler::new(k);
                 let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-                for i in 0..n {
-                    sampler.add_with_rng(i, weights[i], &mut rng).unwrap();
+                for (i, &w) in weights.iter().enumerate().take(n) {
+                    sampler.add_with_rng(i, w, &mut rng).unwrap();
 
                     // After each add, if the reservoir has items, min_idx should be correct.
                     if !sampler.keys.is_empty() {

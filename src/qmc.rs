@@ -409,7 +409,7 @@ mod tests {
         for p in &pts {
             assert_eq!(p.len(), 5);
             for &x in p {
-                assert!(x >= 0.0 && x < 1.0, "out of range: {x}");
+                assert!((0.0..1.0).contains(&x), "out of range: {x}");
             }
         }
     }
@@ -448,7 +448,7 @@ mod tests {
         for p in &pts {
             assert_eq!(p.len(), 4);
             for &x in p {
-                assert!(x >= 0.0 && x < 1.0, "out of range: {x}");
+                assert!((0.0..1.0).contains(&x), "out of range: {x}");
             }
         }
     }
@@ -489,7 +489,7 @@ mod tests {
         for p in &pts {
             assert_eq!(p.len(), 3);
             for &x in p {
-                assert!(x >= 0.0 && x < 1.0, "out of range: {x}");
+                assert!((0.0..1.0).contains(&x), "out of range: {x}");
             }
         }
     }
