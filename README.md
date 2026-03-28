@@ -4,8 +4,7 @@
 [![Documentation](https://docs.rs/kuji/badge.svg)](https://docs.rs/kuji)
 [![CI](https://github.com/arclabs561/kuji/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/kuji/actions/workflows/ci.yml)
 
-Stochastic sampling primitives for unbiased data selection and stream processing.
-Implements Gumbel-max top-k, Gumbel-Softmax relaxations, reservoir sampling (Algorithm L/R), and weighted reservoir (A-Res).
+Stochastic sampling.
 
 Dual-licensed under MIT or Apache-2.0.
 
@@ -41,8 +40,6 @@ assert_eq!(samples.len(), 5);
 | `ReservoirSamplerR` | Algorithm R (Vitter, 1985) -- O(N) baseline |
 | `WeightedReservoirSampler` | A-Res (Efraimidis & Spirakis, 2006) |
 | `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
-
-**vs `rand`**: `rand::seq` provides uniform sampling but not reservoir sampling over streams, weighted reservoir (A-Res), or Gumbel-max top-k.
 
 ## Examples
 
