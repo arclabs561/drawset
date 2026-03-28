@@ -144,15 +144,14 @@ fn build_direction_numbers(dim: usize) -> Vec<[u64; SOBOL_BITS]> {
     // Dimension 1: Van der Corput in base 2.
     {
         let mut row = [0u64; SOBOL_BITS];
-        for i in 0..SOBOL_BITS {
-            row[i] = 1u64 << (SOBOL_BITS - 1 - i);
+        for (i, slot) in row.iter_mut().enumerate() {
+            *slot = 1u64 << (SOBOL_BITS - 1 - i);
         }
         v.push(row);
     }
 
     // Dimensions 2..=dim.
-    for d_idx in 0..dim.saturating_sub(1).min(JOE_KUO_D2_D8.len()) {
-        let (s, a, m_init) = JOE_KUO_D2_D8[d_idx];
+    for &(s, a, m_init) in JOE_KUO_D2_D8.iter().take(dim.saturating_sub(1)) {
         let s = s as usize;
         let mut row = [0u64; SOBOL_BITS];
 
@@ -235,6 +234,7 @@ impl SobolGenerator {
     }
 
     /// Return the next Sobol point in `[0, 1)^d` and advance the counter.
+    #[allow(clippy::should_implement_trait)] // not a standard Iterator (returns Vec, stateful)
     pub fn next(&mut self) -> Vec<f64> {
         if self.index == 0 {
             self.index = 1;

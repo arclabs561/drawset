@@ -129,9 +129,7 @@ pub fn tconorm_fold(family: TConormFamily, values: &[f64]) -> f64 {
         _ => values
             .iter()
             .skip(1)
-            .fold(values[0].clamp(0.0, 1.0), |acc, &v| {
-                tconorm(family, acc, v)
-            }),
+            .fold(values[0].clamp(0.0, 1.0), |acc, &v| tconorm(family, acc, v)),
     }
 }
 
@@ -143,9 +141,7 @@ pub fn tnorm_fold(family: TConormFamily, values: &[f64]) -> f64 {
         _ => values
             .iter()
             .skip(1)
-            .fold(values[0].clamp(0.0, 1.0), |acc, &v| {
-                tnorm(family, acc, v)
-            }),
+            .fold(values[0].clamp(0.0, 1.0), |acc, &v| tnorm(family, acc, v)),
     }
 }
 
