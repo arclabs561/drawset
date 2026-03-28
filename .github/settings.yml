@@ -2,7 +2,7 @@
 # https://github.com/repository-settings/app
 
 repository:
-  description: "Stochastic sampling primitives: Gumbel-Softmax, reservoir sampling, and latent permutations"
+  description: "Stochastic sampling"
   homepage: "https://docs.rs/kuji"
   private: false
   has_issues: true
