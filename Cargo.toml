@@ -12,6 +12,8 @@ keywords = ["sampling", "stochastic", "gumbel-softmax", "probability"]
 categories = ["algorithms", "science"]
 include = ["/src/**/*.rs", "/examples/**/*.rs", "/tests/**/*.rs", "/benches/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE-*", "/README.md"]
 
+[workspace]
+
 [dependencies]
 rand = "0.9"
 
