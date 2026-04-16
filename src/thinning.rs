@@ -9,6 +9,32 @@
 //! - [`kernel_herd`]: Kernel herding (Chen, Welling & Smola 2010). Greedily
 //!   matches the empirical kernel mean embedding, achieving O(1/k) MMD
 //!   convergence vs O(1/sqrt(k)) for iid sampling.
+//!
+//! # API levels
+//!
+//! This module operates on pre-computed Gram matrices (`&[f64]`, row-major).
+//! The caller is responsible for computing the kernel matrix from raw points
+//! and choosing a kernel function.
+//!
+//! The [`rkhs`](https://docs.rs/rkhs) crate provides the complementary
+//! point-level interface: `mmd_biased` and `mmd_unbiased` take raw point
+//! collections and a kernel closure, and `kernel_matrix` builds the Gram
+//! matrix from points. Use `rkhs` to compute the Gram matrix, then pass it
+//! to [`kernel_thin`] or [`kernel_herd`]:
+//!
+//! ```text
+//! // (requires rkhs in your dependencies)
+//! use rkhs::{kernel_matrix, rbf};
+//! use kuji::thinning::kernel_thin;
+//!
+//! let gram = kernel_matrix(&points, |x, y| rbf(x, y, sigma));
+//! let gram_slice: Vec<f64> = gram.into_raw_vec_and_offset().0;
+//! let selected = kernel_thin(&gram_slice, n, k);
+//! ```
+//!
+//! [`mmd_sq_from_gram`] in this module evaluates subset quality from the same
+//! Gram matrix representation; `rkhs::mmd_biased`/`mmd_unbiased` compute MMD
+//! directly from points without needing a pre-built matrix.
 
 /// Greedy kernel thinning via MMD minimization.
 ///
@@ -247,6 +273,11 @@ pub fn kernel_herd(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 ///
 /// Used for evaluating thinning quality. Returns the squared MMD between
 /// the subset (indices in `subset`) and the full set (all n points).
+///
+/// This is the Gram-matrix form of the biased MMD estimator. For the
+/// point-level interface (raw samples + kernel closure), see
+/// `rkhs::mmd_biased` and `rkhs::mmd_unbiased` in the
+/// [`rkhs`](https://docs.rs/rkhs) crate.
 pub fn mmd_sq_from_gram(gram: &[f64], n: usize, subset: &[usize]) -> f64 {
     let m = subset.len();
     if m == 0 {
