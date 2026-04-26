@@ -4,7 +4,8 @@
 [![Documentation](https://docs.rs/kuji/badge.svg)](https://docs.rs/kuji)
 [![CI](https://github.com/arclabs561/kuji/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/kuji/actions/workflows/ci.yml)
 
-Stochastic sampling.
+Stochastic sampling primitives in Rust: Gumbel-Softmax, reservoir
+sampling, and latent permutations.
 
 Dual-licensed under MIT or Apache-2.0.
 
