@@ -541,8 +541,12 @@ mod tests {
         use rand_chacha::ChaCha8Rng;
 
         // ---- Gumbel softmax at very low temperature concentrates on max logit ----
-        // We ensure the max logit has a clear gap (>= 3.0) over the rest,
-        // so that at T=0.01 the Gumbel noise cannot flip the ranking.
+        // The max logit gets a clear gap of 8.0 over the rest. The flip
+        // probability per competitor per trial is sigmoid(-gap) (the Gumbel
+        // difference is logistic): at gap 5.0 that was ~0.7%, enough for a
+        // rare CI flake across 256 proptest cases x 50 trials x 7
+        // competitors; at 8.0 it is ~0.03% and the 0.9 mass bound holds with
+        // wide margin.
         proptest! {
             #[test]
             fn prop_gumbel_softmax_low_temp_concentrates(
@@ -553,7 +557,7 @@ mod tests {
                 // the max by adding a large gap to the current max.
                 let current_max = base_logits.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
                 let mut logits = base_logits;
-                logits[0] = current_max + 5.0; // clear gap of 5.0
+                logits[0] = current_max + 8.0; // clear gap (see comment above)
                 let max_idx = 0;
 
                 // At very low temperature, the mass should be concentrated.
@@ -566,7 +570,7 @@ mod tests {
                 }
                 let avg_mass = mass_at_max / n_trials as f64;
 
-                // With a gap of 3.0 at T=0.01, the dominant logit should
+                // With a gap of 8.0 at T=0.01, the dominant logit should
                 // capture nearly all mass on average.
                 prop_assert!(
                     avg_mass > 0.9,
