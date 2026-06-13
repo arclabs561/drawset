@@ -15,7 +15,7 @@ Dual-licensed under MIT or Apache-2.0.
 
 ```toml
 [dependencies]
-kuji = "0.1.5"
+kuji = "0.1.10"
 ```
 
 ```rust
