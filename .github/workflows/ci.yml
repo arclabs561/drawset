@@ -28,6 +28,8 @@ jobs:
 
       - name: Test
         run: cargo test
+      - name: run example assertions
+        run: cargo run --example streaming_reservoir
 
       - name: Semver check
         if: github.event_name == 'pull_request'
