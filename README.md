@@ -47,6 +47,7 @@ assert_eq!(samples.len(), 5);
 - `cargo run --example distribution_demo`: ASCII histograms showing uniform vs weighted sampling distributions.
 - `cargo run --example weighted_topk`: compare Gumbel-top-k (Plackett--Luce) vs weighted reservoir
   (A-Res) on the same weight vector.
+- `cargo run --example gumbel_softmax_demo`: Gumbel-Softmax (Jang et al. 2017) for differentiable subset selection, the trick that lets discrete sampling sit inside a gradient-trained model.
 - `cargo run --example streaming_reservoir`: stream 1M items through a reservoir of size 100 and verify uniformity.
 
 ## Tests
