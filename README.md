@@ -4,12 +4,26 @@
 [![Documentation](https://docs.rs/kuji/badge.svg)](https://docs.rs/kuji)
 [![CI](https://github.com/arclabs561/kuji/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/kuji/actions/workflows/ci.yml)
 
-Stochastic sampling primitives: Gumbel-Softmax, reservoir
-sampling, and latent permutations.
+A low-level sampling toolbox that other crates can depend on without pulling
+in domain-specific machinery. It provides reservoir sampling (Algorithm L/R
+and weighted A-Res), the Gumbel-max family (categorical sampling, top-k
+without replacement, the Gumbel-Softmax relaxation, relaxed k-hot), graph
+neighbor sampling, quasi-Monte Carlo sequences (Halton, Sobol, Owen-scrambled
+Sobol), kernel thinning and herding (greedy MMD coreset selection), and
+t-norm/t-conorm families for differentiable fuzzy-logic aggregation.
 
 Dual-licensed under MIT or Apache-2.0.
 
 [crates.io](https://crates.io/crates/kuji) | [docs.rs](https://docs.rs/kuji)
+
+## Modules
+
+- `reservoir`: reservoir sampling (Algorithm L/R) and weighted reservoir (A-Res).
+- `gumbel`: Gumbel-max, Gumbel-top-k, Gumbel-Softmax, relaxed k-hot.
+- `neighbor`: graph neighborhood sampling (with and without replacement).
+- `qmc`: quasi-Monte Carlo sequences (Halton, Sobol, Owen-scrambled Sobol).
+- `thinning`: kernel thinning and herding (greedy coreset selection via MMD).
+- `tconorm`: t-norm and t-conorm families for differentiable aggregation.
 
 ## Quickstart
 
@@ -41,6 +55,9 @@ assert_eq!(samples.len(), 5);
 | `ReservoirSamplerR` | Algorithm R (Vitter, 1985) -- O(N) baseline |
 | `WeightedReservoirSampler` | A-Res (Efraimidis & Spirakis, 2006) |
 | `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
+| `halton_sequence` / `sobol_sequence` / `sobol_scrambled` / `SobolGenerator` | Quasi-Monte Carlo low-discrepancy sequences |
+| `kernel_thin` / `kernel_herd` / `mmd_sq_from_gram` | Kernel thinning and herding: greedy MMD coreset selection (Dwivedi & Mackey, 2021) |
+| `tconorm` / `tnorm` / `tconorm_fold` / `tnorm_fold` | T-norm / t-conorm families (max, probabilistic, Lukasiewicz, Einstein, Hamacher) |
 
 ## Examples
 
