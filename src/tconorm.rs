@@ -1,6 +1,6 @@
 //! T-conorm (s-norm) families for fuzzy logic and differentiable relaxations.
 //!
-//! A t-conorm S: [0,1]^2 -> [0,1] generalizes logical OR. It is:
+//! A t-conorm `S: [0,1]^2 -> [0,1]` generalizes logical OR. It is:
 //! - Commutative: S(a, b) = S(b, a)
 //! - Associative: S(S(a, b), c) = S(a, S(b, c))
 //! - Monotone: a1 <= a2 => S(a1, b) <= S(a2, b)
