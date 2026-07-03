@@ -51,8 +51,8 @@ assert_eq!(samples.len(), 5);
 | `gumbel_topk_sample` | Top-k without replacement via Gumbel perturbation |
 | `gumbel_softmax` | Differentiable categorical approximation |
 | `relaxed_topk_gumbel` | Relaxed k-hot via iterated Gumbel-Softmax |
-| `ReservoirSampler` | Algorithm L (Li, 1994) -- O(k(1 + log(N/k))) |
-| `ReservoirSamplerR` | Algorithm R (Vitter, 1985) -- O(N) baseline |
+| `ReservoirSampler` | Algorithm L (Li, 1994): O(k(1 + log(N/k))) |
+| `ReservoirSamplerR` | Algorithm R (Vitter, 1985): O(N) baseline |
 | `WeightedReservoirSampler` | A-Res (Efraimidis & Spirakis, 2006) |
 | `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
 | `halton_sequence` / `sobol_sequence` / `sobol_scrambled` / `SobolGenerator` | Quasi-Monte Carlo low-discrepancy sequences |
@@ -62,7 +62,7 @@ assert_eq!(samples.len(), 5);
 ## Examples
 
 - `cargo run --example distribution_demo`: ASCII histograms showing uniform vs weighted sampling distributions.
-- `cargo run --example weighted_topk`: compare Gumbel-top-k (Plackett--Luce) vs weighted reservoir
+- `cargo run --example weighted_topk`: compare Gumbel-top-k (Plackett-Luce) vs weighted reservoir
   (A-Res) on the same weight vector.
 - `cargo run --example gumbel_softmax_demo`: Gumbel-Softmax (Jang et al. 2017) for differentiable subset selection, the trick that lets discrete sampling sit inside a gradient-trained model.
 - `cargo run --example streaming_reservoir`: stream 1M items through a reservoir of size 100 and verify uniformity.
