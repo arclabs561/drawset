@@ -2,17 +2,8 @@
 
 [![crates.io](https://img.shields.io/crates/v/drawset.svg)](https://crates.io/crates/drawset)
 [![Documentation](https://docs.rs/drawset/badge.svg)](https://docs.rs/drawset)
-[![CI](https://github.com/arclabs561/drawset/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/drawset/actions/workflows/ci.yml)
 
 Sampling and subset-selection primitives.
-
-`drawset` provides reservoir sampling, the Gumbel-max family, graph neighbor
-sampling, quasi-Monte Carlo sequences, and kernel thinning/herding without
-pulling in domain-specific machinery.
-
-Dual-licensed under MIT or Apache-2.0.
-
-[crates.io](https://crates.io/crates/drawset) | [docs.rs](https://docs.rs/drawset)
 
 ## Modules
 
@@ -80,7 +71,7 @@ cargo test -p drawset
 - Vitter (1985): reservoir sampling "Algorithm R".
 - Li (1994): reservoir sampling "Algorithm L" (skip-based; reduces RNG calls).
 - Efraimidis & Spirakis (2006): weighted reservoir sampling (A-Res / A-ExpJ family).
-- Gumbel-max trick: classical extreme value sampling identity (often cited via modern ML papers):
+- Gumbel-max trick: classical extreme value sampling identity (often cited via ML papers):
   - Jang, Gu, Poole (2017): *Categorical Reparameterization with Gumbel-Softmax*.
   - Maddison, Mnih, Teh (2017): *The Concrete Distribution*.
 
