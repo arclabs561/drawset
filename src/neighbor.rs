@@ -19,7 +19,7 @@ use std::collections::HashSet;
 /// # Examples
 ///
 /// ```
-/// use kuji::NeighborSampler;
+/// use drawset::NeighborSampler;
 ///
 /// let sampler = NeighborSampler::new().with_seed(42);
 /// let neighbors = vec![10, 20, 30, 40, 50];
@@ -42,7 +42,7 @@ impl NeighborSampler {
     /// # Examples
     ///
     /// ```
-    /// use kuji::NeighborSampler;
+    /// use drawset::NeighborSampler;
     ///
     /// let sampler = NeighborSampler::new();
     /// ```
@@ -55,7 +55,7 @@ impl NeighborSampler {
     /// # Examples
     ///
     /// ```
-    /// use kuji::NeighborSampler;
+    /// use drawset::NeighborSampler;
     ///
     /// let sampler = NeighborSampler::new().with_seed(123);
     /// ```
@@ -74,7 +74,7 @@ impl NeighborSampler {
     /// # Examples
     ///
     /// ```
-    /// use kuji::NeighborSampler;
+    /// use drawset::NeighborSampler;
     ///
     /// let sampler = NeighborSampler::new().with_seed(42);
     /// let neighbors = vec![1, 2, 3];
@@ -109,7 +109,7 @@ impl NeighborSampler {
     /// # Examples
     ///
     /// ```
-    /// use kuji::NeighborSampler;
+    /// use drawset::NeighborSampler;
     ///
     /// let sampler = NeighborSampler::new().with_seed(42);
     /// let neighbors = vec![1, 2, 3, 4, 5];

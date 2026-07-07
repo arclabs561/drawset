@@ -3,11 +3,11 @@ default:
 
 check:
     cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
-    if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run; else cargo test; fi
+    cargo clippy --workspace --all-targets -- -D warnings
+    if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run --workspace; else cargo test --workspace; fi
 
 test:
-    if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run; else cargo test; fi
+    if command -v cargo-nextest >/dev/null 2>&1; then cargo nextest run --workspace; else cargo test --workspace; fi
 
 fmt:
     cargo fmt --all

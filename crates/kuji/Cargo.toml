@@ -1,0 +1,19 @@
+[package]
+name = "kuji"
+version = "0.1.11"
+edition = "2021"
+rust-version = "1.75"
+description = "Renamed to drawset"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/arclabs561/drawset"
+homepage = "https://github.com/arclabs561/drawset"
+documentation = "https://docs.rs/kuji"
+keywords = ["sampling", "subset", "gumbel", "reservoir"]
+categories = ["algorithms", "science"]
+readme = "README.md"
+
+[dependencies]
+drawset = { path = "../..", version = "0.1.0" }
+
+[package.metadata.docs.rs]
+all-features = true

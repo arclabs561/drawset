@@ -1,11 +1,11 @@
-# kuji examples
+# drawset examples
 
-Examples for the `kuji` stochastic sampling crate.
+Examples for the `drawset` stochastic sampling crate.
 
 ## Running
 
 ```sh
-cargo run -p kuji --example <name>
+cargo run -p drawset --example <name>
 ```
 
 ## Examples

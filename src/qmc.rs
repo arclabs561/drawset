@@ -64,7 +64,7 @@ fn radical_inverse(mut index: u64, base: u64) -> f64 {
 /// # Examples
 ///
 /// ```
-/// let p = kuji::qmc::halton_point(1, 3);
+/// let p = drawset::qmc::halton_point(1, 3);
 /// assert!((p[0] - 0.5).abs() < 1e-12);
 /// assert!((p[1] - 1.0 / 3.0).abs() < 1e-12);
 /// assert!((p[2] - 0.2).abs() < 1e-12);
@@ -91,7 +91,7 @@ pub fn halton_point(index: usize, d: usize) -> Vec<f64> {
 /// # Examples
 ///
 /// ```
-/// let pts = kuji::qmc::halton_sequence(4, 2);
+/// let pts = drawset::qmc::halton_sequence(4, 2);
 /// assert_eq!(pts.len(), 4);
 /// // base-2 first four: 0.5, 0.25, 0.75, 0.125
 /// assert!((pts[0][0] - 0.5).abs() < 1e-12);
@@ -198,7 +198,7 @@ fn rightmost_zero(n: u64) -> usize {
 /// # Examples
 ///
 /// ```
-/// let mut gen = kuji::qmc::SobolGenerator::new(2);
+/// let mut gen = drawset::qmc::SobolGenerator::new(2);
 /// let p0 = gen.next(); // index 0 -> origin (often skipped)
 /// let p1 = gen.next(); // index 1
 /// assert!((p1[0] - 0.5).abs() < 1e-12);
@@ -283,7 +283,7 @@ impl SobolGenerator {
 /// # Examples
 ///
 /// ```
-/// let pts = kuji::qmc::sobol_sequence(4, 1);
+/// let pts = drawset::qmc::sobol_sequence(4, 1);
 /// // 1D Sobol (Gray-code order): 0.5, 0.75, 0.25, 0.375
 /// assert!((pts[0][0] - 0.5).abs() < 1e-12);
 /// assert!((pts[1][0] - 0.75).abs() < 1e-12);
@@ -343,7 +343,7 @@ fn owen_scramble(mut x: u64, dim: u64, seed: u64) -> u64 {
 /// # Examples
 ///
 /// ```
-/// let pts = kuji::qmc::sobol_scrambled(100, 2, 42);
+/// let pts = drawset::qmc::sobol_scrambled(100, 2, 42);
 /// assert_eq!(pts.len(), 100);
 /// for p in &pts {
 ///     assert!(p[0] >= 0.0 && p[0] < 1.0);

@@ -1,6 +1,6 @@
-use kuji::gumbel::{gumbel_softmax, relaxed_topk_gumbel};
-use kuji::gumbel_topk_sample_with_rng;
-use kuji::reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
+use drawset::gumbel::{gumbel_softmax, relaxed_topk_gumbel};
+use drawset::gumbel_topk_sample_with_rng;
+use drawset::reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
 use proptest::prelude::*;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;

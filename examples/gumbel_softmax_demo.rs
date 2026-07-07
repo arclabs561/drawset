@@ -8,7 +8,7 @@
 //! This example shows three temperature regimes on the same logits and
 //! averages over multiple draws to make the convergence visible.
 
-use kuji::gumbel_softmax;
+use drawset::gumbel_softmax;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 

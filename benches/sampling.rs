@@ -1,8 +1,8 @@
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use kuji::reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
-use kuji::{gumbel_max_sample, gumbel_topk_sample};
+use drawset::reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
+use drawset::{gumbel_max_sample, gumbel_topk_sample};
 
 fn bench_reservoir_sampling(c: &mut Criterion) {
     let mut group = c.benchmark_group("reservoir");

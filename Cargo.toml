@@ -1,18 +1,20 @@
 [package]
-name = "kuji"
-version = "0.1.10"
+name = "drawset"
+version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
-description = "Stochastic sampling primitives: Gumbel-Softmax, reservoir sampling, and latent permutations"
+description = "Sampling and subset-selection primitives"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/arclabs561/kuji"
-homepage = "https://github.com/arclabs561/kuji"
-documentation = "https://docs.rs/kuji"
-keywords = ["sampling", "stochastic", "gumbel-softmax", "probability"]
+repository = "https://github.com/arclabs561/drawset"
+homepage = "https://github.com/arclabs561/drawset"
+documentation = "https://docs.rs/drawset"
+keywords = ["sampling", "subset", "gumbel", "reservoir"]
 categories = ["algorithms", "science"]
 include = ["/src/**/*.rs", "/examples/**/*.rs", "/tests/**/*.rs", "/benches/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE-*", "/README.md"]
 
 [workspace]
+members = ["crates/kuji"]
+resolver = "2"
 
 [dependencies]
 rand = "0.9"

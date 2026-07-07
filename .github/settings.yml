@@ -2,8 +2,8 @@
 # https://github.com/repository-settings/app
 
 repository:
-  description: "Stochastic sampling"
-  homepage: "https://docs.rs/kuji"
+  description: "Sampling and subset-selection primitives"
+  homepage: "https://docs.rs/drawset"
   private: false
   has_issues: true
   has_wiki: false

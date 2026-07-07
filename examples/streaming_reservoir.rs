@@ -13,7 +13,7 @@
 //!
 //! Run: cargo run --example streaming_reservoir
 
-use kuji::ReservoirSampler;
+use drawset::ReservoirSampler;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 

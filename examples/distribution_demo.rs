@@ -5,7 +5,7 @@
 //!
 //! Run: cargo run --example distribution_demo
 
-use kuji::{gumbel_topk_sample_with_rng, ReservoirSampler, WeightedReservoirSampler};
+use drawset::{gumbel_topk_sample_with_rng, ReservoirSampler, WeightedReservoirSampler};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 

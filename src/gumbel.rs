@@ -47,7 +47,7 @@ use rand::prelude::*;
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::gumbel_noise;
+/// use drawset::gumbel_noise;
 ///
 /// let mut rng = ChaCha8Rng::seed_from_u64(42);
 /// let g = gumbel_noise(&mut rng);
@@ -73,7 +73,7 @@ pub fn gumbel_noise<R: Rng + ?Sized>(rng: &mut R) -> f64 {
 /// can be drawn.
 ///
 /// ```
-/// use kuji::gumbel_max_sample;
+/// use drawset::gumbel_max_sample;
 ///
 /// let logits = [0.0_f32, 1.0, 2.0, 3.0];
 /// let idx = gumbel_max_sample(&logits);
@@ -84,7 +84,7 @@ pub fn gumbel_noise<R: Rng + ?Sized>(rng: &mut R) -> f64 {
 /// (here index 3) is most likely, but not guaranteed on any single call:
 ///
 /// ```
-/// use kuji::gumbel_max_sample;
+/// use drawset::gumbel_max_sample;
 ///
 /// let logits = [0.0_f32, -1.0, 5.0]; // index 2 is strongly favoured
 /// let mut counts = [0u32; 3];
@@ -128,7 +128,7 @@ pub fn gumbel_max_sample(logits: &[f32]) -> usize {
 /// # Examples
 ///
 /// ```
-/// use kuji::gumbel_topk_sample;
+/// use drawset::gumbel_topk_sample;
 ///
 /// let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
 /// let indices = gumbel_topk_sample(&logits, 3);
@@ -150,7 +150,7 @@ pub fn gumbel_topk_sample(logits: &[f32], k: usize) -> Vec<usize> {
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::gumbel_topk_sample_with_rng;
+/// use drawset::gumbel_topk_sample_with_rng;
 ///
 /// let logits = [0.0_f32, 1.0, 2.0, 3.0, 4.0];
 /// let mut rng = ChaCha8Rng::seed_from_u64(99);
@@ -192,7 +192,7 @@ pub fn gumbel_topk_sample_with_rng<R: Rng + ?Sized>(
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::gumbel_softmax;
+/// use drawset::gumbel_softmax;
 ///
 /// let logits = [1.0_f64, 0.0, -1.0];
 /// let mut rng = ChaCha8Rng::seed_from_u64(7);
@@ -297,7 +297,7 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::relaxed_topk_gumbel;
+/// use drawset::relaxed_topk_gumbel;
 ///
 /// let scores = [0.1_f64, 0.2, 0.3, 0.4, 0.5];
 /// let mut rng = ChaCha8Rng::seed_from_u64(9);

@@ -46,7 +46,7 @@
 //! ```text
 //! // (requires rkhs in your dependencies)
 //! use rkhs::{kernel_matrix, rbf};
-//! use kuji::thinning::kernel_thin;
+//! use drawset::thinning::kernel_thin;
 //!
 //! let gram = kernel_matrix(&points, |x, y| rbf(x, y, sigma));
 //! let gram_slice: Vec<f64> = gram.into_raw_vec_and_offset().0;

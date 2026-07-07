@@ -31,7 +31,7 @@ use rand::prelude::*;
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::ReservoirSampler;
+/// use drawset::ReservoirSampler;
 ///
 /// let mut sampler = ReservoirSampler::new(3);
 /// let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -69,7 +69,7 @@ impl<T> ReservoirSampler<T> {
     /// # Examples
     ///
     /// ```
-    /// use kuji::ReservoirSampler;
+    /// use drawset::ReservoirSampler;
     ///
     /// let mut sampler = ReservoirSampler::new(2);
     /// sampler.add("alpha");
@@ -92,7 +92,7 @@ impl<T> ReservoirSampler<T> {
     /// ```
     /// use rand::SeedableRng;
     /// use rand_chacha::ChaCha8Rng;
-    /// use kuji::ReservoirSampler;
+    /// use drawset::ReservoirSampler;
     ///
     /// let mut sampler = ReservoirSampler::new(5);
     /// let mut rng = ChaCha8Rng::seed_from_u64(0);
@@ -175,7 +175,7 @@ impl<T> ReservoirSampler<T> {
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::ReservoirSamplerR;
+/// use drawset::ReservoirSamplerR;
 ///
 /// let mut sampler = ReservoirSamplerR::new(3);
 /// let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -271,7 +271,7 @@ impl std::error::Error for WeightedReservoirError {}
 /// ```
 /// use rand::SeedableRng;
 /// use rand_chacha::ChaCha8Rng;
-/// use kuji::WeightedReservoirSampler;
+/// use drawset::WeightedReservoirSampler;
 ///
 /// let mut sampler = WeightedReservoirSampler::new(2);
 /// let mut rng = ChaCha8Rng::seed_from_u64(42);
@@ -318,7 +318,7 @@ impl<T> WeightedReservoirSampler<T> {
     /// ```
     /// use rand::SeedableRng;
     /// use rand_chacha::ChaCha8Rng;
-    /// use kuji::WeightedReservoirSampler;
+    /// use drawset::WeightedReservoirSampler;
     ///
     /// let mut sampler = WeightedReservoirSampler::new(1);
     /// let mut rng = ChaCha8Rng::seed_from_u64(0);

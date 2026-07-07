@@ -1,20 +1,18 @@
-# kuji
+# drawset
 
-[![crates.io](https://img.shields.io/crates/v/kuji.svg)](https://crates.io/crates/kuji)
-[![Documentation](https://docs.rs/kuji/badge.svg)](https://docs.rs/kuji)
-[![CI](https://github.com/arclabs561/kuji/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/kuji/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/drawset.svg)](https://crates.io/crates/drawset)
+[![Documentation](https://docs.rs/drawset/badge.svg)](https://docs.rs/drawset)
+[![CI](https://github.com/arclabs561/drawset/actions/workflows/ci.yml/badge.svg)](https://github.com/arclabs561/drawset/actions/workflows/ci.yml)
 
-A low-level sampling toolbox that other crates can depend on without pulling
-in domain-specific machinery. It provides reservoir sampling (Algorithm L/R
-and weighted A-Res), the Gumbel-max family (categorical sampling, top-k
-without replacement, the Gumbel-Softmax relaxation, relaxed k-hot), graph
-neighbor sampling, quasi-Monte Carlo sequences (Halton, Sobol, Owen-scrambled
-Sobol), kernel thinning and herding (greedy MMD coreset selection), and
-t-norm/t-conorm families for differentiable fuzzy-logic aggregation.
+Sampling and subset-selection primitives.
+
+`drawset` provides reservoir sampling, the Gumbel-max family, graph neighbor
+sampling, quasi-Monte Carlo sequences, and kernel thinning/herding without
+pulling in domain-specific machinery.
 
 Dual-licensed under MIT or Apache-2.0.
 
-[crates.io](https://crates.io/crates/kuji) | [docs.rs](https://docs.rs/kuji)
+[crates.io](https://crates.io/crates/drawset) | [docs.rs](https://docs.rs/drawset)
 
 ## Modules
 
@@ -23,17 +21,16 @@ Dual-licensed under MIT or Apache-2.0.
 - `neighbor`: graph neighborhood sampling (with and without replacement).
 - `qmc`: quasi-Monte Carlo sequences (Halton, Sobol, Owen-scrambled Sobol).
 - `thinning`: kernel thinning and herding (greedy coreset selection via MMD).
-- `tconorm`: t-norm and t-conorm families for differentiable aggregation.
 
 ## Quickstart
 
 ```toml
 [dependencies]
-kuji = "0.1.10"
+drawset = "0.1.0"
 ```
 
 ```rust
-use kuji::reservoir::ReservoirSampler;
+use drawset::reservoir::ReservoirSampler;
 
 let mut sampler = ReservoirSampler::new(5);
 for i in 0..100 {
@@ -57,7 +54,6 @@ assert_eq!(samples.len(), 5);
 | `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
 | `halton_sequence` / `sobol_sequence` / `sobol_scrambled` / `SobolGenerator` | Quasi-Monte Carlo low-discrepancy sequences |
 | `kernel_thin` / `kernel_herd` / `mmd_sq_from_gram` | Kernel thinning and herding: greedy MMD coreset selection (Dwivedi & Mackey, 2021) |
-| `tconorm` / `tnorm` / `tconorm_fold` / `tnorm_fold` | T-norm / t-conorm families (max, probabilistic, Lukasiewicz, Einstein, Hamacher) |
 
 ## Examples
 
@@ -70,7 +66,7 @@ assert_eq!(samples.len(), 5);
 ## Tests
 
 ```bash
-cargo test -p kuji
+cargo test -p drawset
 ```
 
 ## Performance

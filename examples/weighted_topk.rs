@@ -11,7 +11,7 @@
 //! This example draws 10,000 samples from each method and prints empirical selection
 //! frequencies, making the distributional difference visible.
 
-use kuji::{gumbel_topk_sample_with_rng, WeightedReservoirSampler};
+use drawset::{gumbel_topk_sample_with_rng, WeightedReservoirSampler};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 

@@ -1,4 +1,4 @@
-//! `kuji`: stochastic sampling primitives.
+//! `drawset`: sampling and subset-selection primitives.
 //!
 //! This crate is meant to be a low-level “sampling toolbox” that other crates can
 //! depend on without pulling in domain-specific machinery.
@@ -17,7 +17,6 @@ pub mod gumbel;
 pub mod neighbor;
 pub mod qmc;
 pub mod reservoir;
-pub mod tconorm;
 pub mod thinning;
 
 pub use gumbel::{
@@ -27,5 +26,4 @@ pub use gumbel::{
 pub use neighbor::NeighborSampler;
 pub use qmc::{halton_point, halton_sequence, sobol_scrambled, sobol_sequence, SobolGenerator};
 pub use reservoir::{ReservoirSampler, ReservoirSamplerR, WeightedReservoirSampler};
-pub use tconorm::{tconorm, tconorm_fold, tnorm, tnorm_fold, TConormFamily};
 pub use thinning::{kernel_herd, kernel_thin, mmd_sq_from_gram};
