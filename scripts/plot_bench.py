@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["matplotlib"]
 # ///
-"""Generate throughput benchmark plot for kuji README."""
+"""Generate throughput benchmark plot for the drawset README."""
 
 import matplotlib
 matplotlib.use("Agg")
@@ -34,7 +34,7 @@ for name, data in [("Alg L", alg_l), ("Alg R", alg_r), ("A-Res", a_res)]:
 
 ax1.set_xlabel("Stream size (N, k=100)", fontsize=11)
 ax1.set_ylabel("Throughput (Melem/s)", fontsize=11)
-ax1.set_title("kuji: reservoir sampling throughput", fontsize=12, fontweight="bold")
+ax1.set_title("drawset: reservoir sampling throughput", fontsize=12, fontweight="bold")
 ax1.legend(frameon=True, fontsize=9, loc="upper right")
 ax1.set_xscale("log")
 ax1.grid(True, alpha=0.3)
@@ -73,6 +73,6 @@ for i in range(1, len(table_data) + 1):
         table[i, j].set_facecolor("#f8fafc" if i % 2 == 0 else "white")
 
 fig.tight_layout(pad=2.0)
-out = "/Users/arc/Documents/dev/kuji/docs/bench_throughput.png"
+out = "/Users/arc/Documents/dev/drawset/docs/bench_throughput.png"
 fig.savefig(out, dpi=150, bbox_inches="tight", facecolor="white")
 print(f"Saved {out}")
