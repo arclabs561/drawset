@@ -1,6 +1,6 @@
 [package]
 name = "drawset"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 description = "Sampling and subset-selection primitives"
@@ -17,6 +17,7 @@ members = ["crates/kuji"]
 resolver = "2"
 
 [dependencies]
+lowdisc = "0.1"
 rand = "0.9"
 
 [package.metadata.docs.rs]

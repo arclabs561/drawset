@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.1] - 2026-07-07
+
+### Changed
+
+- Re-exported quasi-Monte Carlo sequences from `lowdisc`.
+
 ## [0.1.0] - 2026-07-07
 
 ### Changed

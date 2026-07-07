@@ -10,14 +10,14 @@ Sampling and subset-selection primitives.
 - `reservoir`: reservoir sampling (Algorithm L/R) and weighted reservoir (A-Res).
 - `gumbel`: Gumbel-max, Gumbel-top-k, Gumbel-Softmax, relaxed k-hot.
 - `neighbor`: graph neighborhood sampling (with and without replacement).
-- `qmc`: quasi-Monte Carlo sequences (Halton, Sobol, Owen-scrambled Sobol).
+- `qmc`: quasi-Monte Carlo sequences re-exported from `lowdisc`.
 - `thinning`: kernel thinning and herding (greedy coreset selection via MMD).
 
 ## Quickstart
 
 ```toml
 [dependencies]
-drawset = "0.1.0"
+drawset = "0.1.1"
 ```
 
 ```rust
@@ -43,7 +43,7 @@ assert_eq!(samples.len(), 5);
 | `ReservoirSamplerR` | Algorithm R (Vitter, 1985): O(N) baseline |
 | `WeightedReservoirSampler` | A-Res (Efraimidis & Spirakis, 2006) |
 | `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
-| `halton_sequence` / `sobol_sequence` / `sobol_scrambled` / `SobolGenerator` | Quasi-Monte Carlo low-discrepancy sequences |
+| `halton_sequence` / `sobol_sequence` / `sobol_scrambled` / `SobolGenerator` | Quasi-Monte Carlo sequences from `lowdisc` |
 | `kernel_thin` / `kernel_herd` / `mmd_sq_from_gram` | Kernel thinning and herding: greedy MMD coreset selection (Dwivedi & Mackey, 2021) |
 
 ## Examples
