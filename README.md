@@ -62,9 +62,10 @@ cargo test -p drawset
 
 ## Performance
 
-![Benchmark throughput](docs/bench_throughput.png)
+![Throughput from a recorded benchmark run](docs/bench_throughput.png)
 
-*Apple Silicon (NEON). Run `cargo bench` to reproduce on your hardware.*
+*Recorded on Apple Silicon (NEON). The plotting script contains this fixed
+snapshot; `cargo bench` produces fresh measurements for your hardware.*
 
 ## References (what these implementations are trying to be faithful to)
 

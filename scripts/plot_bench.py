@@ -7,6 +7,7 @@
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 # Benchmark data from criterion (Apple Silicon, NEON)
 # Format: name -> {stream_size: median_time_us}
@@ -73,6 +74,6 @@ for i in range(1, len(table_data) + 1):
         table[i, j].set_facecolor("#f8fafc" if i % 2 == 0 else "white")
 
 fig.tight_layout(pad=2.0)
-out = "/Users/arc/Documents/dev/drawset/docs/bench_throughput.png"
+out = Path(__file__).resolve().parent.parent / "docs" / "bench_throughput.png"
 fig.savefig(out, dpi=150, bbox_inches="tight", facecolor="white")
 print(f"Saved {out}")
