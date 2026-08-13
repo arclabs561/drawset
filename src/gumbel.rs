@@ -408,6 +408,28 @@ mod tests {
     }
 
     #[test]
+    fn gumbel_max_frequencies_match_categorical_probabilities() {
+        let logits = [0.0_f32, 2.0_f32.ln(), 4.0_f32.ln()];
+        let expected = [1.0 / 7.0, 2.0 / 7.0, 4.0 / 7.0];
+        let trials = 70_000;
+        let mut counts = [0usize; 3];
+        let mut rng = ChaCha8Rng::seed_from_u64(0xCA7E_60A1);
+
+        for _ in 0..trials {
+            let selected = gumbel_topk_sample_with_rng(&logits, 1, &mut rng)[0];
+            counts[selected] += 1;
+        }
+
+        for (i, (&count, &probability)) in counts.iter().zip(expected.iter()).enumerate() {
+            let observed = count as f64 / trials as f64;
+            assert!(
+                (observed - probability).abs() < 0.01,
+                "category {i}: observed={observed:.5}, expected={probability:.5}, counts={counts:?}"
+            );
+        }
+    }
+
+    #[test]
     fn gumbel_softmax_is_a_probability_vector() {
         let logits = [1.0_f64, 0.0, -1.0];
         let mut rng = ChaCha8Rng::seed_from_u64(7);
@@ -431,6 +453,98 @@ mod tests {
         let sum: f64 = khot.iter().sum();
         // It’s a relaxation, not exact k, but should be close-ish for sane temperatures.
         assert!((sum - k as f64).abs() < 1e-6, "sum={sum}");
+    }
+
+    #[test]
+    fn relaxed_topk_low_temperature_matches_hard_topk() {
+        let scores = [0.3, -0.8, 1.4, 0.1, 2.0];
+        let k = 3;
+        let seed = 0x70F_60A1;
+        let mut relaxed_rng = ChaCha8Rng::seed_from_u64(seed);
+        let mut hard_rng = ChaCha8Rng::seed_from_u64(seed);
+
+        let relaxed = relaxed_topk_gumbel(&scores, k, 1e-6, 1.0, &mut relaxed_rng);
+        let mut perturbed: Vec<_> = scores
+            .iter()
+            .enumerate()
+            .map(|(i, &score)| (i, score + gumbel_noise(&mut hard_rng)))
+            .collect();
+        perturbed.sort_by(|(i_a, a), (i_b, b)| b.total_cmp(a).then_with(|| i_a.cmp(i_b)));
+        let mut hard = vec![0.0; scores.len()];
+        for (i, _) in perturbed.into_iter().take(k) {
+            hard[i] = 1.0;
+        }
+
+        let sum: f64 = relaxed.iter().sum();
+        assert!((sum - k as f64).abs() < 1e-12, "sum={sum}");
+        for (i, (&actual, &expected)) in relaxed.iter().zip(hard.iter()).enumerate() {
+            assert!(
+                (actual - expected).abs() < 1e-8,
+                "index {i}: relaxed={actual}, hard={expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn gumbel_softmax_jacobian_matches_finite_differences() {
+        let logits = [-0.7, 0.2, 1.1];
+        let temperature = 0.8;
+        let scale = 1.3;
+        let seed = 0x5A17_0001;
+        let mut base_rng = ChaCha8Rng::seed_from_u64(seed);
+        let probabilities = gumbel_softmax(&logits, temperature, scale, &mut base_rng);
+        let step = 1e-6;
+
+        for column in 0..logits.len() {
+            let mut plus = logits;
+            let mut minus = logits;
+            plus[column] += step;
+            minus[column] -= step;
+            let mut plus_rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut minus_rng = ChaCha8Rng::seed_from_u64(seed);
+            let plus_probs = gumbel_softmax(&plus, temperature, scale, &mut plus_rng);
+            let minus_probs = gumbel_softmax(&minus, temperature, scale, &mut minus_rng);
+
+            for row in 0..logits.len() {
+                let finite_difference = (plus_probs[row] - minus_probs[row]) / (2.0 * step);
+                let kronecker = if row == column { 1.0 } else { 0.0 };
+                let analytic =
+                    scale / temperature * probabilities[row] * (kronecker - probabilities[column]);
+                assert!(
+                    (finite_difference - analytic).abs() < 1e-8,
+                    "jacobian[{row},{column}]: finite={finite_difference}, analytic={analytic}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn relaxed_topk_finite_difference_jacobian_preserves_total_mass() {
+        let scores = [-1.2, -0.1, 0.8, 1.7];
+        let seed = 0x5A17_0002;
+        let step = 1e-6;
+
+        for column in 0..scores.len() {
+            let mut plus = scores;
+            let mut minus = scores;
+            plus[column] += step;
+            minus[column] -= step;
+            let mut plus_rng = ChaCha8Rng::seed_from_u64(seed);
+            let mut minus_rng = ChaCha8Rng::seed_from_u64(seed);
+            let plus_mask = relaxed_topk_gumbel(&plus, 2, 0.9, 1.0, &mut plus_rng);
+            let minus_mask = relaxed_topk_gumbel(&minus, 2, 0.9, 1.0, &mut minus_rng);
+            let derivative_sum: f64 = plus_mask
+                .iter()
+                .zip(minus_mask.iter())
+                .map(|(plus, minus)| (plus - minus) / (2.0 * step))
+                .sum();
+
+            assert!(derivative_sum.is_finite());
+            assert!(
+                derivative_sum.abs() < 1e-8,
+                "Jacobian column {column} changes total mass by {derivative_sum}"
+            );
+        }
     }
 
     #[test]

@@ -264,7 +264,8 @@ impl std::error::Error for WeightedReservoirError {}
 /// A weighted reservoir sampler (Efraimidis-Spirakis, A-Res).
 ///
 /// Each item with weight `w_i` gets a key `u^(1/w_i)` where `u ~ Uniform(0,1)`.
-/// Keep the top-k keys.
+/// Keep the top-k keys. The implementation stores the equivalent log-key
+/// `ln(u) / w_i` to avoid underflow for small positive weights.
 ///
 /// # Examples
 ///
@@ -346,7 +347,10 @@ impl<T> WeightedReservoirSampler<T> {
         }
 
         let u = rng.random::<f64>().max(f64::MIN_POSITIVE);
-        let key = (u.ln() / weight).exp();
+        // Comparing ln(u) / weight is equivalent to comparing u^(1/weight),
+        // but does not collapse small positive weights to zero through exp
+        // underflow.
+        let key = u.ln() / weight;
 
         if self.items.len() < self.k {
             // Track min during the fill phase.
@@ -378,7 +382,7 @@ impl<T> WeightedReservoirSampler<T> {
         &self.items
     }
 
-    /// Keys for diagnostics/benchmarking.
+    /// Log-keys (`ln(u) / weight`) for diagnostics/benchmarking.
     pub fn keys(&self) -> &[f64] {
         &self.keys
     }
@@ -543,6 +547,58 @@ mod tests {
 
         assert!(counts[0] > counts[1]);
         assert!(counts[0] > counts[2]);
+    }
+
+    #[test]
+    fn weighted_reservoir_inclusion_frequencies_follow_weight_order() {
+        let weights = [1.0, 2.0, 4.0];
+        let expected = [1.0 / 7.0, 2.0 / 7.0, 4.0 / 7.0];
+        let trials = 35_000;
+        let mut counts = [0usize; 3];
+
+        for trial in 0..trials {
+            let mut sampler = WeightedReservoirSampler::new(1);
+            let mut rng = ChaCha8Rng::seed_from_u64(0xA_E5_u64.wrapping_add(trial as u64));
+            for (item, &weight) in weights.iter().enumerate() {
+                sampler
+                    .add_with_rng(item, weight, &mut rng)
+                    .expect("weights are valid");
+            }
+            counts[sampler.samples()[0]] += 1;
+        }
+
+        assert!(counts[0] < counts[1] && counts[1] < counts[2], "{counts:?}");
+        for (i, (&count, &probability)) in counts.iter().zip(expected.iter()).enumerate() {
+            let observed = count as f64 / trials as f64;
+            assert!(
+                (observed - probability).abs() < 0.015,
+                "item {i}: observed={observed:.5}, expected={probability:.5}, counts={counts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn weighted_reservoir_preserves_tiny_weight_ratios() {
+        let trials = 10_000;
+        let mut counts = [0usize; 2];
+
+        for trial in 0..trials {
+            let mut sampler = WeightedReservoirSampler::new(1);
+            let mut rng = ChaCha8Rng::seed_from_u64(0x71A7_0000 + trial as u64);
+            sampler
+                .add_with_rng(0, 1e-300, &mut rng)
+                .expect("weight is positive and finite");
+            sampler
+                .add_with_rng(1, 2e-300, &mut rng)
+                .expect("weight is positive and finite");
+            counts[sampler.samples()[0]] += 1;
+        }
+
+        let heavier_frequency = counts[1] as f64 / trials as f64;
+        assert!(
+            (heavier_frequency - 2.0 / 3.0).abs() < 0.025,
+            "tiny weights lost their 1:2 ratio: counts={counts:?}"
+        );
     }
 
     #[test]
