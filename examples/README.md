@@ -1,6 +1,6 @@
 # drawset examples
 
-Examples for the `drawset` stochastic sampling crate.
+Small demonstrations of drawset's sampling APIs.
 
 ## Running
 
@@ -12,6 +12,7 @@ cargo run -p drawset --example <name>
 
 | Example | Description |
 |---|---|
-| `weighted_topk` | Compares Gumbel-top-k (Plackett-Luce) and weighted reservoir sampling (A-Res). Draws 10,000 samples and prints a frequency table showing the distributional difference for k>1. |
-| `streaming_reservoir` | Algorithm L reservoir sampling over a 1M-item stream with reservoir size 100. Demonstrates O(k) memory. Verifies uniform sampling via a bucketed chi-squared check over 5,000 trials. |
-| `gumbel_softmax_demo` | Gumbel-Softmax for differentiable subset selection. Shows three temperature regimes (high/medium/low) and how the soft distribution converges to one-hot as temperature decreases. |
+| `weighted_topk` | Weighted selection from a slice of logits or a stream of weights. Both target the same subset distribution, with different interfaces and output ordering. |
+| `streaming_reservoir` | Keeps 100 items from a one-million-item stream in one pass. |
+| `gumbel_softmax_demo` | Shows how temperature changes individual relaxed samples and their average. Returns numeric weights, without autodiff. |
+| `distribution_demo` | Prints histograms of uniform and weighted reservoir samples. |

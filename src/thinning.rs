@@ -1,35 +1,8 @@
-//! Kernel thinning: coreset selection minimizing kernel discrepancy.
+//! Greedy kernel selection from a pre-computed Gram matrix.
 //!
-//! # Why kernel thinning?
-//!
-//! When you have `n` samples (from MCMC, a simulator, or a large dataset) and need to
-//! summarize them with `k << n` representative points, the naive approach is to take
-//! every `n/k`-th point or draw `k` points uniformly at random. Both give IID-quality
-//! subsets: their Maximum Mean Discrepancy (MMD) to the full set decays as O(1/√k).
-//!
-//! **Kernel thinning gives O(1/k) MMD convergence** -- a quadratically better rate.
-//! For k=100, this is the difference between MMD ≈ 0.1 (IID) and MMD ≈ 0.01 (thinning).
-//! The gain is deterministic: no randomness, no tuning, provable for any kernel that
-//! satisfies a mild smoothness condition.
-//!
-//! This result is from Dwivedi & Mackey (2021), who proved that greedy coreset
-//! selection (picking each new point to minimally increase MMD²(S, X)) achieves the
-//! O(1/k) rate for translation-invariant kernels including RBF, Matérn, and Laplace.
-//!
-//! # Convergence comparison
-//!
-//! | Method | MMD decay | Deterministic? | With-replacement? |
-//! |--------|-----------|---------------|-------------------|
-//! | IID subsampling | O(1/√k) | No | Yes |
-//! | Kernel herding | O(1/k) | Yes | Yes |
-//! | Kernel thinning | O(1/k) | Yes | No |
-//!
-//! Both algorithms in this module achieve the O(1/k) rate. The practical difference:
-//! - [`kernel_thin`] selects without replacement (each point appears at most once),
-//!   which is natural for compressing a fixed dataset.
-//! - [`kernel_herd`] selects with replacement and matches the kernel mean embedding
-//!   directly (Chen, Welling & Smola 2010). Useful when k > n or when the optimal
-//!   coreset needs repeated points.
+//! [`kernel_thin`] chooses unique indices by minimizing the biased MMD objective at
+//! each step. [`kernel_herd`] chooses indices with replacement by maximizing its
+//! current mean-embedding residual.
 //!
 //! # API levels
 //!
@@ -59,21 +32,13 @@
 //!
 //! # References
 //!
-//! - Dwivedi & Mackey (2021): "Kernel Thinning" -- proves O(1/k) MMD convergence
-//!   for greedy coreset selection, the theoretical foundation for [`kernel_thin`].
-//! - Chen, Welling & Smola (2010): "Super-Samples from Kernel Herding" -- introduces
-//!   the herding algorithm and its O(1/k) mean embedding convergence guarantee.
+//! - Dwivedi & Mackey (2021): "Kernel Thinning".
+//! - Chen, Welling & Smola (2010): "Super-Samples from Kernel Herding".
 
 /// Greedy kernel thinning via MMD minimization.
 ///
 /// Selects a subset S of `k` points from `n` candidates. At each step, adds the point
-/// from `X \ S` that minimizes MMD²(S ∪ {x}, X). The resulting subset achieves
-/// **O(1/k) MMD convergence** to the full point set -- quadratically better than the
-/// O(1/√k) rate of IID subsampling.
-///
-/// This implements the coreset construction from Dwivedi & Mackey (2021), which
-/// proves that greedy MMD minimization achieves the O(1/k) rate for any
-/// translation-invariant kernel (RBF, Matérn, Laplace, etc.).
+/// from `X \ S` that minimizes MMD²(S ∪ {x}, X) under the supplied Gram matrix.
 ///
 /// # Arguments
 ///
@@ -89,8 +54,7 @@
 ///
 /// # Complexity
 ///
-/// O(nk) time, O(n) auxiliary space. For large `n` and `k`, this is O(n²) in the
-/// worst case (k = n), but in practice k << n.
+/// O(n² + nk) time and O(n) auxiliary space, excluding the dense input matrix.
 ///
 /// # References
 ///
@@ -117,12 +81,11 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
     let mut selected = Vec::with_capacity(k);
     let mut in_set = vec![false; n];
 
-    // Running sums for the MMD^2 incremental update.
+    // Running sums for the MMD² incremental update.
     // We track: sum_within = sum_{i,j in S} K[i,j]
     //           sum_cross[c] = sum_{i in S} K[i,c] for each candidate c
     // MMD^2(S, X) = sum_within/|S|^2 - 2 * sum_{i in S} col_mean[i] / |S| + const
     //
-    // Actually, it's simpler to track the objective directly.
     // MMD^2(S, X) = (1/|S|^2) sum_{i,j in S} K[i,j]
     //             - (2/(|S|*n)) sum_{i in S} sum_{j=0..n} K[i,j]
     //             + (1/n^2) sum_{i,j} K[i,j]
@@ -137,63 +100,10 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
     //
     // We minimize: sum_within'/(|S|+1)^2 - 2*cross_sum_new/(|S|+1)
 
-    // sum_cross[c] = sum_{i in S} K[i,c]
+    // sum_cross[c] = sum_{i in S} K[i,c].
     let mut sum_cross = vec![0.0; n];
     let mut sum_within = 0.0;
     let mut cross_mean_sum = 0.0; // sum_{i in S} col_mean[i]
-
-    for step in 0..k {
-        let s = step; // current |S|
-        let s_new = (s + 1) as f64;
-        let s_new_sq = s_new * s_new;
-
-        let mut best_idx = usize::MAX;
-        let mut best_obj = f64::INFINITY;
-
-        for c in 0..n {
-            if in_set[c] {
-                continue;
-            }
-
-            let new_within = sum_within + 2.0 * sum_cross[c] + gram[c * n + c];
-            let new_cross_mean = cross_mean_sum + col_mean[c];
-
-            // Objective: within_term - 2 * cross_term (ignoring constant)
-            let obj = new_within / s_new_sq - 2.0 * new_cross_mean / s_new;
-
-            if obj < best_obj {
-                best_obj = obj;
-                best_idx = c;
-            }
-        }
-
-        // Update state
-        selected.push(best_idx);
-        in_set[best_idx] = true;
-
-        // Update sum_cross for all candidates
-        for c in 0..n {
-            sum_cross[c] += gram[best_idx * n + c];
-        }
-        sum_within += 2.0 * (sum_cross[best_idx] - gram[best_idx * n + best_idx])
-            + gram[best_idx * n + best_idx];
-        // After updating sum_cross, sum_cross[best_idx] already includes K[best_idx, best_idx].
-        // sum_within should be: old_sum_within + 2*old_sum_cross[best_idx] + K[best_idx,best_idx]
-        // But we updated sum_cross first, so sum_cross[best_idx] = old + K[best_idx,best_idx].
-        // Fix: compute sum_within before updating sum_cross.
-        // Let me restructure.
-
-        cross_mean_sum += col_mean[best_idx];
-    }
-
-    // The sum_within tracking above has a bug from ordering. Let me rewrite cleanly.
-    // Actually, let me just redo the whole loop correctly.
-    selected.clear();
-    in_set.fill(false);
-
-    let mut sum_cross = vec![0.0; n];
-    let mut sum_within = 0.0;
-    let mut cross_mean_sum = 0.0;
 
     for step in 0..k {
         let s_new = (step + 1) as f64;
@@ -210,6 +120,7 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
             let new_within = sum_within + 2.0 * sum_cross[c] + gram[c * n + c];
             let new_cross_mean = cross_mean_sum + col_mean[c];
 
+            // Objective: within_term - 2 * cross_term, omitting the shared constant.
             let obj = new_within / s_new_sq - 2.0 * new_cross_mean / s_new;
 
             if obj < best_obj {
@@ -221,7 +132,7 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
         selected.push(best_idx);
         in_set[best_idx] = true;
 
-        // Update sum_within BEFORE updating sum_cross
+        // Update `sum_within` before `sum_cross`, whose next value includes K[i, i].
         sum_within += 2.0 * sum_cross[best_idx] + gram[best_idx * n + best_idx];
         cross_mean_sum += col_mean[best_idx];
 
@@ -236,17 +147,14 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 
 /// Kernel herding: deterministic sampling via greedy mean embedding matching.
 ///
-/// At each step, picks the point whose kernel evaluation most reduces the residual
-/// between the empirical mean embedding and the subset mean embedding. Achieves
-/// **O(1/k) MMD convergence**, compared to O(1/√k) for IID subsampling.
+/// At each step, picks the point with the largest residual between the empirical
+/// mean embedding and the selected points' mean embedding.
 ///
 /// Kernel herding is the "greedy matching" complement to [`kernel_thin`]:
 /// - [`kernel_thin`] minimizes MMD²(S, X) directly (without replacement).
 /// - [`kernel_herd`] matches the kernel mean embedding greedily (with replacement).
 ///
-/// The with-replacement selection means herding is useful when `k > n` (more
-/// summary points than candidates) or when the optimal coreset is known to have
-/// repeated points. The returned indices may contain duplicates.
+/// The with-replacement selection permits `k > n`; returned indices may repeat.
 ///
 /// # Arguments
 ///
@@ -259,6 +167,10 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 ///
 /// Indices of the `k` selected points, in selection order. May contain duplicates
 /// when k > n or when the greedy algorithm revisits a point.
+///
+/// # Complexity
+///
+/// O(n² + nk) time and O(n) auxiliary space, excluding the dense input matrix.
 ///
 /// # References
 ///
@@ -367,6 +279,7 @@ pub fn mmd_sq_from_gram(gram: &[f64], n: usize, subset: &[usize]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     fn simple_gram(n: usize) -> Vec<f64> {
         // RBF-like gram matrix from 1D points [0, 1, ..., n-1]
@@ -446,6 +359,46 @@ mod tests {
         // Center point (index 5) should maximize col_mean
         // and minimize the objective
         assert_eq!(sel[0], 5, "k=1 should select the center point (index 5)");
+    }
+
+    proptest! {
+        #[test]
+        fn thin_each_prefix_minimizes_mmd_on_small_psd_grams(
+            points in prop::collection::vec(-4.0f64..4.0, 1..8),
+            requested_k in 1usize..8,
+        ) {
+            let n = points.len();
+            let k = requested_k.min(n);
+            let mut gram = vec![0.0; n * n];
+            for i in 0..n {
+                for j in 0..n {
+                    let distance_sq = (points[i] - points[j]).powi(2);
+                    gram[i * n + j] = (-distance_sq / 2.0).exp();
+                }
+            }
+
+            let selected = kernel_thin(&gram, n, k);
+            let mut prefix = Vec::with_capacity(k);
+            for &chosen in &selected {
+                let best_candidate_mmd = (0..n)
+                    .filter(|candidate| !prefix.contains(candidate))
+                    .map(|candidate| {
+                        let mut candidate_prefix = prefix.clone();
+                        candidate_prefix.push(candidate);
+                        mmd_sq_from_gram(&gram, n, &candidate_prefix)
+                    })
+                    .fold(f64::INFINITY, f64::min);
+
+                let mut chosen_prefix = prefix.clone();
+                chosen_prefix.push(chosen);
+                let chosen_mmd = mmd_sq_from_gram(&gram, n, &chosen_prefix);
+                prop_assert!(
+                    chosen_mmd <= best_candidate_mmd + 1e-10,
+                    "selected index {chosen} had MMD² {chosen_mmd}, but the best candidate had {best_candidate_mmd}",
+                );
+                prefix.push(chosen);
+            }
+        }
     }
 
     #[test]

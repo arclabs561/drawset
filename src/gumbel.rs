@@ -187,6 +187,10 @@ pub fn gumbel_topk_sample_with_rng<R: Rng + ?Sized>(
 /// Returns a soft one-hot vector that approaches a hard one-hot as
 /// temperature -> 0.
 ///
+/// This evaluates the relaxation using plain floating-point values. It does not
+/// record an autodiff graph or return gradients. With fixed noise and positive
+/// temperature, the underlying softmax formula is differentiable in the logits.
+///
 /// # Examples
 ///
 /// ```
@@ -271,6 +275,8 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
 /// (Kool et al., 2019; Xie & Ermon, 2019):
 /// add one Gumbel perturbation, then iteratively apply a masked softmax k times,
 /// accumulating a k-hot relaxation (entries sum to approximately k).
+///
+/// Returns plain floating-point values, without automatic differentiation.
 ///
 /// This is different from taking `max` over k independent categorical samples
 /// (which does not enforce without-replacement top-k structure).

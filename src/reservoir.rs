@@ -2,7 +2,7 @@
 //!
 //! Maintains a uniform sample of size `k` from a stream of unknown length.
 //!
-//! Uses **Algorithm L** (Li, 1994) for optimal performance.
+//! Uses **Algorithm L** (Li, 1994) to reduce random-number generation.
 //! Instead of generating a random number for every item (Algorithm R),
 //! we compute the number of items to *skip* before the next replacement.
 //! This reduces complexity from O(N) RNG calls to O(k * (1 + log(N/k))).
@@ -24,7 +24,9 @@ use rand::prelude::*;
 
 /// A reservoir sampler that maintains a uniform sample of size `k` from a stream.
 ///
-/// Uses **Algorithm L** (Li, 1994) for O(k(1 + log(N/k))) complexity.
+/// Uses **Algorithm L** (Li, 1994) to skip random draws between replacements.
+/// Processing `N` items takes O(N) time and O(k) space. For `N >= k > 0`,
+/// the expected number of random draws is O(k(1 + log(N/k))).
 ///
 /// # Examples
 ///

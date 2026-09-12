@@ -5,15 +5,7 @@
 
 Sampling and subset-selection primitives.
 
-## Modules
-
-- `reservoir`: reservoir sampling (Algorithm L/R) and weighted reservoir (A-Res).
-- `gumbel`: Gumbel-max, Gumbel-top-k, Gumbel-Softmax, relaxed k-hot.
-- `neighbor`: graph neighborhood sampling (with and without replacement).
-- `qmc`: quasi-Monte Carlo sequences re-exported from `lowdisc`.
-- `thinning`: kernel thinning and herding (greedy coreset selection via MMD).
-
-## Quickstart
+## Usage
 
 ```toml
 [dependencies]
@@ -21,60 +13,62 @@ drawset = "0.1.1"
 ```
 
 ```rust
-use drawset::reservoir::ReservoirSampler;
+use drawset::ReservoirSampler;
 
-let mut sampler = ReservoirSampler::new(5);
-for i in 0..100 {
-    sampler.add(i);
+// Keep 100 items without collecting the whole stream or knowing its length.
+let mut sampler = ReservoirSampler::new(100);
+for item in 0..1_000_000 {
+    sampler.add(item);
 }
-let samples = sampler.samples();
-assert_eq!(samples.len(), 5);
+println!("Kept {} of {} items", sampler.samples().len(), sampler.seen());
 ```
 
-## Operations
-
-| Function / Type | Description |
-|----------------|-------------|
-| `gumbel_max_sample` | Categorical sample via Gumbel-max trick |
-| `gumbel_topk_sample` | Top-k without replacement via Gumbel perturbation |
-| `gumbel_softmax` | Differentiable categorical approximation |
-| `relaxed_topk_gumbel` | Relaxed k-hot via iterated Gumbel-Softmax |
-| `ReservoirSampler` | Algorithm L (Li, 1994): O(k(1 + log(N/k))) |
-| `ReservoirSamplerR` | Algorithm R (Vitter, 1985): O(N) baseline |
-| `WeightedReservoirSampler` | A-Res (Efraimidis & Spirakis, 2006) |
-| `NeighborSampler` | Graph neighborhood sampling (with/without replacement) |
-| `halton_sequence` / `sobol_sequence` / `sobol_scrambled` / `SobolGenerator` | Quasi-Monte Carlo sequences from `lowdisc` |
-| `kernel_thin` / `kernel_herd` / `mmd_sq_from_gram` | Kernel thinning and herding: greedy MMD coreset selection (Dwivedi & Mackey, 2021) |
-
-## Examples
-
-- `cargo run --example distribution_demo`: ASCII histograms showing uniform vs weighted sampling distributions.
-- `cargo run --example weighted_topk`: compare Gumbel-top-k (Plackett-Luce) vs weighted reservoir
-  (A-Res) on the same weight vector.
-- `cargo run --example gumbel_softmax_demo`: Gumbel-Softmax (Jang et al. 2017) for differentiable subset selection, the trick that lets discrete sampling sit inside a gradient-trained model.
-- `cargo run --example streaming_reservoir`: stream 1M items through a reservoir of size 100 and verify uniformity.
-
-## Tests
-
-```bash
-cargo test -p drawset
+```text
+Kept 100 of 1000000 items
 ```
 
-## Performance
+The reservoir stores at most `k` items. Algorithm L skips random draws between
+replacements; this item-at-a-time API still visits every input. Use
+`add_with_rng` with a seeded RNG for repeatable runs. Algorithm R is also available
+as `ReservoirSamplerR`.
 
-![Throughput from a recorded benchmark run](docs/bench_throughput.png)
+## Choosing a sampler
 
-*Recorded on Apple Silicon (NEON). The plotting script contains this fixed
-snapshot; `cargo bench` produces fresh measurements for your hardware.*
+| Input and purpose | API |
+|---|---|
+| Stream, uniform sample without replacement | `ReservoirSampler` |
+| Stream, positive weighted sample without replacement | `WeightedReservoirSampler` |
+| Logits, one categorical draw or several distinct indices | `gumbel_max_sample`, `gumbel_topk_sample` |
+| Logits, continuous selection weights | `gumbel_softmax`, `relaxed_topk_gumbel` |
+| Kernel Gram matrix, deterministic representative indices | `kernel_thin`, `kernel_herd` |
 
-## References (what these implementations are trying to be faithful to)
+Weighted reservoirs take finite positive weights; Gumbel samplers take logits
+(log-weights). A-Res and Gumbel-top-k target the same weighted subset distribution
+when those weights correspond. Their returned order need not match. See the
+[weighted selection example](examples/weighted_topk.rs).
 
-- Vitter (1985): reservoir sampling "Algorithm R".
-- Li (1994): reservoir sampling "Algorithm L" (skip-based; reduces RNG calls).
-- Efraimidis & Spirakis (2006): weighted reservoir sampling (A-Res / A-ExpJ family).
-- Gumbel-max trick: classical extreme value sampling identity (often cited via ML papers):
-  - Jang, Gu, Poole (2017): *Categorical Reparameterization with Gumbel-Softmax*.
-  - Maddison, Mnih, Teh (2017): *The Concrete Distribution*.
+The relaxations return floating-point vectors; they do not provide automatic
+differentiation. The kernel selectors require a dense `n × n` Gram matrix supplied
+by the caller. `kernel_thin` greedily minimizes MMD without replacement;
+`kernel_herd` can select an index more than once.
+
+The crate also includes `NeighborSampler` for sampling a neighbor slice, plus
+quasi-Monte Carlo sequence re-exports from [lowdisc](https://crates.io/crates/lowdisc).
+See the [API documentation](https://docs.rs/drawset) for input requirements and
+algorithm references.
+
+## Examples and checks
+
+```sh
+cargo run --example streaming_reservoir
+cargo run --example weighted_topk
+cargo run --example gumbel_softmax_demo
+cargo test --workspace
+```
+
+More examples are listed in [examples/](examples/README.md). For local performance
+measurements, run `cargo bench --bench sampling`. Contributor checks are described
+in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
