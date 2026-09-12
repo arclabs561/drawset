@@ -10,30 +10,31 @@
 //! The caller is responsible for computing the kernel matrix from raw points
 //! and choosing a kernel function.
 //!
-//! The [`rkhs`](https://docs.rs/rkhs) crate provides the complementary
-//! point-level interface: `mmd_biased` and `mmd_unbiased` take raw point
-//! collections and a kernel closure, and `kernel_matrix` builds the Gram
-//! matrix from points. Use `rkhs` to compute the Gram matrix, then pass it
-//! to [`kernel_thin`] or [`kernel_herd`]:
+//! For example, construct a linear-kernel Gram matrix from scalar points:
 //!
-//! ```text
-//! // (requires rkhs in your dependencies)
-//! use rkhs::{kernel_matrix, rbf};
-//! use drawset::thinning::kernel_thin;
+//! ```
+//! use drawset::{kernel_thin, mmd_sq_from_gram};
 //!
-//! let gram = kernel_matrix(&points, |x, y| rbf(x, y, sigma));
-//! let gram_slice: Vec<f64> = gram.into_raw_vec_and_offset().0;
-//! let selected = kernel_thin(&gram_slice, n, k);
+//! let points = [-2.0, 0.0, 3.0];
+//! let gram: Vec<f64> = points.iter()
+//!     .flat_map(|x| points.iter().map(move |y| x * y))
+//!     .collect();
+//! let selected = kernel_thin(&gram, points.len(), 2);
+//! let discrepancy = mmd_sq_from_gram(&gram, points.len(), &selected);
+//! assert!(discrepancy >= -1e-12);
 //! ```
 //!
 //! [`mmd_sq_from_gram`] in this module evaluates subset quality from the same
-//! Gram matrix representation; `rkhs::mmd_biased`/`mmd_unbiased` compute MMD
-//! directly from points without needing a pre-built matrix.
+//! Gram matrix representation. Symmetry and positive semidefiniteness are the
+//! caller's responsibility; they are not checked. Scale the kernel so sums and
+//! products remain representable in `f64`.
 //!
 //! # References
 //!
-//! - Dwivedi & Mackey (2021): "Kernel Thinning".
 //! - Chen, Welling & Smola (2010): "Super-Samples from Kernel Herding".
+//!
+//! Despite its historical name, `kernel_thin` is greedy MMD selection, not the
+//! split-and-swap algorithm in Dwivedi & Mackey (2021), "Kernel Thinning".
 
 /// Greedy kernel thinning via MMD minimization.
 ///
@@ -42,8 +43,8 @@
 ///
 /// # Arguments
 ///
-/// * `gram` - n × n kernel Gram matrix in row-major order. Must be symmetric positive
-///   semi-definite. Compute with `rkhs::kernel_matrix` or your own kernel function.
+/// * `gram` - finite n × n kernel Gram matrix in row-major order. Must be symmetric
+///   positive semi-definite, with entries small enough to avoid arithmetic overflow.
 /// * `n` - Number of candidate points (rows/cols in `gram`).
 /// * `k` - Number of points to select (must be ≤ n). Each point is selected at most once.
 ///
@@ -51,17 +52,21 @@
 ///
 /// Indices of the `k` selected points, in selection order. Indices are unique (no
 /// duplicates). Use [`mmd_sq_from_gram`] to evaluate the quality of the returned subset.
+/// Equal objectives choose the lowest available index. `k = 0` returns an empty
+/// vector, including when `n = 0`.
 ///
 /// # Complexity
 ///
 /// O(n² + nk) time and O(n) auxiliary space, excluding the dense input matrix.
 ///
-/// # References
+/// # Panics
 ///
-/// Dwivedi & Mackey (2021): "Kernel Thinning".
+/// Panics for an invalid matrix shape, `k > n`, non-finite entries, or a
+/// non-finite selection objective. Symmetry and positive semidefiniteness are
+/// not checked.
 pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
     assert!(k <= n, "k ({k}) must be <= n ({n})");
-    assert_eq!(gram.len(), n * n, "gram must be n*n");
+    validate_gram(gram, n);
 
     if k == 0 {
         return Vec::new();
@@ -122,6 +127,7 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 
             // Objective: within_term - 2 * cross_term, omitting the shared constant.
             let obj = new_within / s_new_sq - 2.0 * new_cross_mean / s_new;
+            assert!(obj.is_finite(), "kernel selection objective overflowed");
 
             if obj < best_obj {
                 best_obj = obj;
@@ -158,8 +164,8 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 ///
 /// # Arguments
 ///
-/// * `gram` - n × n kernel Gram matrix in row-major order. Must be positive
-///   semi-definite.
+/// * `gram` - finite n × n kernel Gram matrix in row-major order. Must be symmetric
+///   positive semi-definite, with entries small enough to avoid arithmetic overflow.
 /// * `n` - Number of candidate points (rows/cols in `gram`).
 /// * `k` - Number of points to select. May exceed `n` (with-replacement).
 ///
@@ -167,17 +173,26 @@ pub fn kernel_thin(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 ///
 /// Indices of the `k` selected points, in selection order. May contain duplicates
 /// when k > n or when the greedy algorithm revisits a point.
+/// Equal residuals choose the lowest index. `k = 0` returns an empty vector,
+/// but `n` must still be positive.
 ///
 /// # Complexity
 ///
-/// O(n² + nk) time and O(n) auxiliary space, excluding the dense input matrix.
+/// O(n² + nk) time, O(n) auxiliary space, and O(k) output space, excluding the
+/// dense input matrix.
+///
+/// # Panics
+///
+/// Panics for `n = 0`, an invalid matrix shape, non-finite entries, or a
+/// non-finite selection residual. Symmetry and positive semidefiniteness are
+/// not checked.
 ///
 /// # References
 ///
 /// Chen, Welling & Smola (2010): "Super-Samples from Kernel Herding."
 pub fn kernel_herd(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
     assert!(n > 0, "n must be > 0");
-    assert_eq!(gram.len(), n * n, "gram must be n*n");
+    validate_gram(gram, n);
 
     if k == 0 {
         return Vec::new();
@@ -212,6 +227,7 @@ pub fn kernel_herd(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 
         for j in 0..n {
             let val = mu[j] - sum_kernel[j] / t;
+            assert!(val.is_finite(), "kernel selection residual overflowed");
             if val > best_val {
                 best_val = val;
                 best_idx = j;
@@ -233,15 +249,26 @@ pub fn kernel_herd(gram: &[f64], n: usize, k: usize) -> Vec<usize> {
 /// Used for evaluating thinning quality. Returns the squared MMD between
 /// the subset (indices in `subset`) and the full set (all n points).
 ///
-/// This is the Gram-matrix form of the biased MMD estimator. For the
-/// point-level interface (raw samples + kernel closure), see
-/// `rkhs::mmd_biased` and `rkhs::mmd_unbiased` in the
-/// [`rkhs`](https://docs.rs/rkhs) crate.
+/// Repeated indices carry repeated empirical mass. For compatibility, an empty
+/// subset returns `0.0` without inspecting the matrix; this is a sentinel, not
+/// the discrepancy of an empty probability distribution. Roundoff can produce
+/// a small negative result even for a positive semidefinite matrix.
+///
+/// Requires a finite symmetric positive semidefinite matrix whose intermediate
+/// sums fit in `f64`. Symmetry and positive semidefiniteness are not checked.
+/// Takes O(n² + mn + m²) time and O(1) auxiliary space, where `m = subset.len()`.
+///
+/// # Panics
+///
+/// For a nonempty subset, panics on an invalid matrix shape, non-finite entries,
+/// or a subset index outside `0..n`.
 pub fn mmd_sq_from_gram(gram: &[f64], n: usize, subset: &[usize]) -> f64 {
     let m = subset.len();
     if m == 0 {
         return 0.0;
     }
+    validate_gram(gram, n);
+    assert!(subset.iter().all(|&i| i < n), "subset index must be < n");
 
     let mf = m as f64;
     let nf = n as f64;
@@ -274,6 +301,15 @@ pub fn mmd_sq_from_gram(gram: &[f64], n: usize, subset: &[usize]) -> f64 {
     kxx /= nf * nf;
 
     kss - ksx + kxx
+}
+
+fn validate_gram(gram: &[f64], n: usize) {
+    let expected = n.checked_mul(n).expect("n*n overflows usize");
+    assert_eq!(gram.len(), expected, "gram must be n*n");
+    assert!(
+        gram.iter().all(|value| value.is_finite()),
+        "gram must be finite"
+    );
 }
 
 #[cfg(test)]
@@ -366,6 +402,7 @@ mod tests {
         fn thin_each_prefix_minimizes_mmd_on_small_psd_grams(
             points in prop::collection::vec(-4.0f64..4.0, 1..8),
             requested_k in 1usize..8,
+            linear_kernel in any::<bool>(),
         ) {
             let n = points.len();
             let k = requested_k.min(n);
@@ -373,7 +410,11 @@ mod tests {
             for i in 0..n {
                 for j in 0..n {
                     let distance_sq = (points[i] - points[j]).powi(2);
-                    gram[i * n + j] = (-distance_sq / 2.0).exp();
+                    gram[i * n + j] = if linear_kernel {
+                        points[i] * points[j]
+                    } else {
+                        (-distance_sq / 2.0).exp()
+                    };
                 }
             }
 
@@ -455,5 +496,35 @@ mod tests {
         let all: Vec<usize> = (0..n).collect();
         let mmd = mmd_sq_from_gram(&gram, n, &all);
         assert!(mmd.abs() < 1e-12, "MMD^2(X, X) should be 0, got {mmd}");
+    }
+
+    #[test]
+    fn ties_follow_index_order_and_herding_keeps_repeated_mass() {
+        let gram = [1.0; 9];
+        assert_eq!(kernel_thin(&gram, 3, 3), [0, 1, 2]);
+        assert_eq!(kernel_herd(&gram, 3, 4), [0, 0, 0, 0]);
+        // Linear kernel on [0, 2]: full mean 1, repeated-subset mean 2/3.
+        let discrepancy = mmd_sq_from_gram(&[0.0, 0.0, 0.0, 4.0], 2, &[0, 0, 1]);
+        assert!((discrepancy - 1.0 / 9.0).abs() < 1e-12);
+        assert!(kernel_thin(&[], 0, 0).is_empty());
+        assert_eq!(mmd_sq_from_gram(&[], 0, &[]), 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "gram must be finite")]
+    fn thinning_rejects_nan_before_selection() {
+        kernel_thin(&[f64::NAN], 1, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "n*n overflows usize")]
+    fn matrix_shape_does_not_wrap() {
+        kernel_thin(&[], usize::MAX, 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "subset index must be < n")]
+    fn mmd_rejects_invalid_subset_indices() {
+        mmd_sq_from_gram(&[1.0; 4], 2, &[2]);
     }
 }

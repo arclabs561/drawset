@@ -23,17 +23,12 @@
 //! - Huijben et al. (2022): *A Review of the Gumbel-max Trick and its Extensions for
 //!   Discrete Stochasticity in Machine Learning* -- comprehensive taxonomy of Gumbel-max
 //!   variants (top-k, straight-through, truncated).
-//! - Sander et al. (ICML 2023): *Fast, Differentiable and Sparse Top-k: a Convex Analysis
-//!   Perspective* -- convex-analysis alternative to Gumbel-Softmax for differentiable
-//!   top-k selection; avoids the temperature-tuning problem.
-//! - Huang et al. (ACL 2025): *Gumbel Reranking: Differentiable End-to-End Reranking with
-//!   Gumbel-Top-k Sampling for Information Retrieval* -- concrete application of the
-//!   Gumbel-top-k trick for differentiable reranking in neural IR pipelines.
 //!
 //! Notes:
 //! - This module provides `*_with_rng` variants where determinism matters (tests/benches).
 //! - Functions that call `rand::rng()` internally are convenience wrappers and are not deterministic
-//!   across processes by design.
+//!   across processes by design. Random variates have finite precision, so the
+//!   implemented distribution approximates the continuous law.
 
 use rand::prelude::*;
 
@@ -54,13 +49,116 @@ use rand::prelude::*;
 /// assert!(g.is_finite());
 /// ```
 pub fn gumbel_noise<R: Rng + ?Sized>(rng: &mut R) -> f64 {
-    let u: f64 = rng.random_range(0.0..1.0);
-    // Clamp to avoid log(0)
-    let u = u.clamp(1e-10, 1.0 - 1e-10);
+    // Open01 excludes both endpoints without clipping valid tail draws.
+    let u: f64 = rng.sample(rand::distr::Open01);
     -(-u.ln()).ln()
 }
 
+/// Returns Gumbel-perturbed scores relative to the largest scaled logit.
+///
+/// The reference logit has the largest scaled value, so each returned scaled
+/// logit difference is non-positive. Representing differences instead of
+/// `scale * logit` keeps an extreme finite winner finite for consumers that
+/// compare raw scores or subsequently subtract their maximum.
+fn gumbel_perturbed_scores<R: Rng + ?Sized>(logits: &[f64], scale: f64, rng: &mut R) -> Vec<f64> {
+    debug_assert!(!logits.is_empty());
+    let noise: Vec<f64> = (0..logits.len()).map(|_| gumbel_noise(rng)).collect();
+    gumbel_perturbed_scores_from_noise(logits, scale, &noise)
+}
+
+/// Applies a supplied Gumbel perturbation to scores relative to their maximum.
+fn gumbel_perturbed_scores_from_noise(logits: &[f64], scale: f64, noise: &[f64]) -> Vec<f64> {
+    debug_assert!(!logits.is_empty());
+    debug_assert_eq!(logits.len(), noise.len());
+
+    // Non-finite scales were never a supported input. Keep the previous
+    // downstream fallback behavior for them rather than assigning a new law.
+    if !scale.is_finite() {
+        return logits
+            .iter()
+            .zip(noise)
+            .map(|(&logit, &noise)| noise + scale * logit)
+            .collect();
+    }
+
+    let reference = if scale > 0.0 {
+        logits.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+    } else if scale < 0.0 {
+        logits.iter().copied().fold(f64::INFINITY, f64::min)
+    } else {
+        logits[0]
+    };
+
+    logits
+        .iter()
+        .zip(noise)
+        .map(|(&logit, &noise)| {
+            let difference = logit - reference;
+            let scaled_difference = if difference.is_finite() {
+                scale * difference
+            } else {
+                let scaled_logit = scale * logit;
+                let scaled_reference = scale * reference;
+                if scaled_logit.is_finite() && scaled_reference.is_finite() {
+                    scaled_logit - scaled_reference
+                } else {
+                    f64::NEG_INFINITY
+                }
+            };
+            noise + scaled_difference
+        })
+        .collect()
+}
+
+/// Calculates `scale * logit / temperature` without intermediate overflow.
+///
+/// `temperature` must be finite and positive. The fast paths preserve ordinary
+/// arithmetic where it is representable; the logarithmic fallback is used only
+/// when neither multiplication order can represent the finite result.
+fn scaled_logit_over_temperature(logit: f64, scale: f64, temperature: f64) -> f64 {
+    debug_assert!(temperature.is_finite() && temperature > 0.0);
+    debug_assert!(logit.is_finite() && scale.is_finite());
+
+    if logit == 0.0 || scale == 0.0 {
+        return 0.0;
+    }
+
+    let product = scale * logit;
+    if product.is_finite() {
+        return product / temperature;
+    }
+
+    let coefficient = scale / temperature;
+    let normalized = coefficient * logit;
+    if coefficient != 0.0 && normalized.is_finite() {
+        return normalized;
+    }
+
+    let log_magnitude = scale.abs().ln() + logit.abs().ln() - temperature.ln();
+    let magnitude = log_magnitude.exp();
+    if scale.is_sign_positive() == logit.is_sign_positive() {
+        magnitude
+    } else {
+        -magnitude
+    }
+}
+
+/// Returns a perturbed f32 score and the noise used to break rounded ties.
+///
+/// `f32` logits can be too large for adding a unit-scale Gumbel variate to
+/// change their representation. Computing in `f64` covers the common case;
+/// retaining the noise preserves the categorical law when equal large logits
+/// still round to the same `f64` score.
+fn gumbel_perturbed_f32<R: Rng + ?Sized>(logit: f32, rng: &mut R) -> (f64, f64) {
+    let noise = gumbel_noise(rng);
+    (f64::from(logit) + noise, noise)
+}
+
 /// Sample an index using the Gumbel-max trick.
+///
+/// `logits` must contain finite values. This convenience wrapper obtains its
+/// own random source; use [`gumbel_topk_sample_with_rng`] with `k = 1` when a
+/// caller-controlled RNG is required.
 ///
 /// # Panics
 ///
@@ -102,11 +200,11 @@ pub fn gumbel_max_sample(logits: &[f32]) -> usize {
 
     let mut rng = rand::rng();
     let mut best_i = 0usize;
-    let mut best = f32::NEG_INFINITY;
+    let mut best = (f64::NEG_INFINITY, f64::NEG_INFINITY);
 
     for (i, &logit) in logits.iter().enumerate() {
-        let score = logit + gumbel_noise(&mut rng) as f32;
-        if score > best {
+        let score = gumbel_perturbed_f32(logit, &mut rng);
+        if score.0 > best.0 || (score.0 == best.0 && score.1 > best.1) {
             best = score;
             best_i = i;
         }
@@ -118,8 +216,11 @@ pub fn gumbel_max_sample(logits: &[f32]) -> usize {
 /// Sample k indices without replacement using the Gumbel-top-k trick.
 ///
 /// Returns indices sorted by decreasing perturbed score (deterministic tie-break by index).
-/// The resulting subset is drawn from the Plackett-Luce distribution over size-k subsets,
-/// where each item's inclusion probability is proportional to exp(logit_i).
+/// The resulting ordered draw follows the Plackett-Luce procedure: at each
+/// rank, an item is drawn with probability proportional to `exp(logit)` among
+/// the remaining items. Marginal inclusion probabilities for `k > 1` are not
+/// simply proportional to `exp(logit_i)`.
+/// `logits` must contain finite values.
 ///
 /// # Panics
 ///
@@ -144,6 +245,9 @@ pub fn gumbel_topk_sample(logits: &[f32], k: usize) -> Vec<usize> {
 }
 
 /// Gumbel-top-k with a caller-supplied RNG (for tests/benchmarks).
+///
+/// For identical inputs, drawset version, RNG type, and RNG state, this
+/// produces the same ordered result. `logits` must contain finite values.
 ///
 /// # Examples
 ///
@@ -172,20 +276,35 @@ pub fn gumbel_topk_sample_with_rng<R: Rng + ?Sized>(
         "gumbel_topk_sample: k must be <= logits.len()"
     );
 
-    let mut scored: Vec<(usize, f32)> = Vec::with_capacity(logits.len());
+    let mut scored: Vec<(usize, f64, f64)> = Vec::with_capacity(logits.len());
     for (i, &logit) in logits.iter().enumerate() {
-        scored.push((i, logit + gumbel_noise(rng) as f32));
+        let (score, noise) = gumbel_perturbed_f32(logit, rng);
+        scored.push((i, score, noise));
     }
 
-    scored.sort_by(|(i_a, s_a), (i_b, s_b)| s_b.total_cmp(s_a).then_with(|| i_a.cmp(i_b)));
+    scored.sort_by(|(i_a, score_a, noise_a), (i_b, score_b, noise_b)| {
+        score_b
+            .total_cmp(score_a)
+            .then_with(|| noise_b.total_cmp(noise_a))
+            .then_with(|| i_a.cmp(i_b))
+    });
 
-    scored.iter().take(k).map(|(i, _)| *i).collect()
+    scored.iter().take(k).map(|(i, _, _)| *i).collect()
 }
 
 /// Gumbel-Softmax: differentiable approximation to categorical sampling.
 ///
 /// Returns a soft one-hot vector that approaches a hard one-hot as
 /// temperature -> 0.
+///
+/// For finite logits, finite `scale`, and positive finite `temperature`, the
+/// result is finite, non-negative, and sums to one. Extreme finite logits are
+/// normalized before temperature scaling. Non-finite logits or `scale` have no
+/// defined probabilistic interpretation.
+///
+/// An empty input returns an empty vector and a singleton returns `[1.0]`.
+/// Zero, negative, or non-finite temperatures use a stochastic hard one-hot
+/// fallback instead of a continuous relaxation.
 ///
 /// This evaluates the relaxation using plain floating-point values. It does not
 /// record an autodiff graph or return gradients. With fixed noise and positive
@@ -224,10 +343,10 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
 
     // If temperature is invalid, fall back to a hard (stochastic) one-hot.
     if !temperature.is_finite() || temperature <= 0.0 {
+        let noisy = gumbel_perturbed_scores(logits, scale, rng);
         let mut best_i = 0usize;
         let mut best = f64::NEG_INFINITY;
-        for (i, &l) in logits.iter().enumerate() {
-            let s = gumbel_noise(rng) + scale * l;
+        for (i, &s) in noisy.iter().enumerate() {
             if s > best {
                 best = s;
                 best_i = i;
@@ -238,22 +357,42 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
         return out;
     }
 
-    let mut noisy = Vec::with_capacity(n);
-    let mut max_val = f64::NEG_INFINITY;
+    let noise: Vec<f64> = (0..n).map(|_| gumbel_noise(rng)).collect();
+    let raw_scores = gumbel_perturbed_scores_from_noise(logits, scale, &noise);
+    let (scores, divide_after_max): (Vec<f64>, bool) =
+        if logits.iter().all(|logit| logit.is_finite())
+            && raw_scores.iter().all(|score| score.is_finite())
+        {
+            (raw_scores, true)
+        } else if logits.iter().all(|logit| logit.is_finite()) && scale.is_finite() {
+            let normalized: Vec<f64> = logits
+                .iter()
+                .zip(&noise)
+                .map(|(&logit, &noise)| {
+                    scaled_logit_over_temperature(logit, scale, temperature) + noise / temperature
+                })
+                .collect();
 
-    for &l in logits {
-        let val = (gumbel_noise(rng) + scale * l) / temperature;
-        if val > max_val {
-            max_val = val;
-        }
-        noisy.push(val);
-    }
+            if normalized.iter().all(|score| score.is_finite()) {
+                (normalized, false)
+            } else {
+                (raw_scores, true)
+            }
+        } else {
+            (raw_scores, true)
+        };
+    let max_val = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
 
     // Softmax
     let mut sum = 0.0;
     let mut probs = Vec::with_capacity(n);
-    for val in noisy {
-        let p = (val - max_val).exp();
+    for val in scores {
+        let difference = val - max_val;
+        let p = if divide_after_max {
+            (difference / temperature).exp()
+        } else {
+            difference.exp()
+        };
         sum += p;
         probs.push(p);
     }
@@ -277,6 +416,12 @@ pub fn gumbel_softmax<R: Rng + ?Sized>(
 /// accumulating a k-hot relaxation (entries sum to approximately k).
 ///
 /// Returns plain floating-point values, without automatic differentiation.
+/// For finite scores, finite `scale`, and positive finite `temperature`, every
+/// element is finite and the elements sum to `k` within floating-point error.
+/// Non-finite scores or `scale` have no defined probabilistic interpretation.
+/// Empty inputs and `k = 0` return an empty vector; `k >= scores.len()` returns
+/// all ones. Zero, negative, or non-finite temperatures use a stochastic hard
+/// k-hot fallback when `0 < k < scores.len()`.
 ///
 /// This is different from taking `max` over k independent categorical samples
 /// (which does not enforce without-replacement top-k structure).
@@ -333,10 +478,9 @@ pub fn relaxed_topk_gumbel<R: Rng + ?Sized>(
 
     // If temperature is invalid, fall back to a hard k-hot (stochastic) selection.
     if !temperature.is_finite() || temperature <= 0.0 {
-        let mut scored: Vec<(usize, f64)> = scores
-            .iter()
+        let mut scored: Vec<(usize, f64)> = gumbel_perturbed_scores(scores, scale, rng)
+            .into_iter()
             .enumerate()
-            .map(|(i, &s)| (i, gumbel_noise(rng) + scale * s))
             .collect();
         scored.sort_by(|(i_a, s_a), (i_b, s_b)| s_b.total_cmp(s_a).then_with(|| i_a.cmp(i_b)));
         let mut out = vec![0.0; n];
@@ -346,11 +490,34 @@ pub fn relaxed_topk_gumbel<R: Rng + ?Sized>(
         return out;
     }
 
-    // Base Gumbel perturbation.
-    let mut scores_gumbel: Vec<f64> = scores
-        .iter()
-        .map(|&s| gumbel_noise(rng) + scale * s)
-        .collect();
+    // Work in temperature-normalized coordinates when each finite input can
+    // be represented there. That avoids losing a high-temperature finite
+    // difference merely because the unnormalized product overflows. The raw
+    // relative path preserves the low-temperature behavior when normalization
+    // itself overflows.
+    let noise: Vec<f64> = (0..n).map(|_| gumbel_noise(rng)).collect();
+    let raw_scores = gumbel_perturbed_scores_from_noise(scores, scale, &noise);
+    let (mut scores_gumbel, normalized_coordinates): (Vec<f64>, bool) =
+        if scores.iter().all(|score| score.is_finite())
+            && raw_scores.iter().all(|score| score.is_finite())
+        {
+            (raw_scores, false)
+        } else if scores.iter().all(|score| score.is_finite()) && scale.is_finite() {
+            let normalized: Vec<f64> = scores
+                .iter()
+                .zip(&noise)
+                .map(|(&score, &noise)| {
+                    scaled_logit_over_temperature(score, scale, temperature) + noise / temperature
+                })
+                .collect();
+            if normalized.iter().all(|score| score.is_finite()) {
+                (normalized, true)
+            } else {
+                (raw_scores, false)
+            }
+        } else {
+            (raw_scores, false)
+        };
 
     let eps = 1e-8_f64;
     let mut onehot: Vec<f64> = vec![0.0; n];
@@ -360,7 +527,11 @@ pub fn relaxed_topk_gumbel<R: Rng + ?Sized>(
         // Mask out previously selected mass: add log(1 - onehot) to logits.
         for (sg, &oh) in scores_gumbel.iter_mut().zip(onehot.iter()) {
             let m = (1.0 - oh).max(eps);
-            *sg += m.ln();
+            *sg += if normalized_coordinates {
+                m.ln() / temperature
+            } else {
+                m.ln()
+            };
         }
 
         // Softmax(scores_gumbel / temperature)
@@ -369,7 +540,12 @@ pub fn relaxed_topk_gumbel<R: Rng + ?Sized>(
             .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
         let mut sum = 0.0;
         for (oh, &sg) in onehot.iter_mut().zip(scores_gumbel.iter()) {
-            let p = ((sg - max_val) / temperature).exp();
+            let difference = sg - max_val;
+            let p = if normalized_coordinates {
+                difference.exp()
+            } else {
+                (difference / temperature).exp()
+            };
             *oh = p;
             sum += p;
         }
@@ -445,6 +621,95 @@ mod tests {
         assert!(probs.iter().all(|p| p.is_finite() && *p >= 0.0));
         let sum: f64 = probs.iter().sum();
         assert!((sum - 1.0).abs() < 1e-9, "sum={sum}");
+    }
+
+    #[test]
+    fn gumbel_softmax_extreme_finite_inputs_do_not_fall_back_to_uniform() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0xE57E_0001);
+        let probabilities = gumbel_softmax(&[1e308, -1e308], 1e-308, 1.0, &mut rng);
+
+        assert_eq!(probabilities, vec![1.0, 0.0]);
+
+        // `scale * logit` overflows before division here, yet the normalized
+        // scores are finite (+1 and -1). Check the fixed-noise analytic value
+        // rather than accepting a uniform fallback.
+        let seed = 0xE57E_0002;
+        let mut expected_rng = ChaCha8Rng::seed_from_u64(seed);
+        let first_noise = gumbel_noise(&mut expected_rng);
+        let second_noise = gumbel_noise(&mut expected_rng);
+        let expected = 1.0
+            / (1.0 + (-((1.0 + first_noise / f64::MAX) - (-1.0 + second_noise / f64::MAX))).exp());
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+        let probabilities = gumbel_softmax(&[f64::MAX, -f64::MAX], f64::MAX, 1.0, &mut rng);
+        assert!((probabilities[0] - expected).abs() < 1e-15);
+        assert!((probabilities[1] - (1.0 - expected)).abs() < 1e-15);
+
+        // The other multiplication order is required when `scale` overflows
+        // first but `scale / temperature` is representable.
+        let seed = 0xE57E_0003;
+        let mut expected_rng = ChaCha8Rng::seed_from_u64(seed);
+        let first_noise = gumbel_noise(&mut expected_rng);
+        let second_noise = gumbel_noise(&mut expected_rng);
+        let expected = 1.0
+            / (1.0 + (-((2.0 + first_noise / f64::MAX) - (1.0 + second_noise / f64::MAX))).exp());
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+        let probabilities = gumbel_softmax(&[2.0, 1.0], f64::MAX, f64::MAX, &mut rng);
+        assert!((probabilities[0] - expected).abs() < 1e-15);
+        assert!((probabilities[1] - (1.0 - expected)).abs() < 1e-15);
+
+        // For k=1, the relaxed construction has the same first softmax round.
+        let seed = 0xE57E_0004;
+        let mut expected_rng = ChaCha8Rng::seed_from_u64(seed);
+        let first_noise = gumbel_noise(&mut expected_rng);
+        let second_noise = gumbel_noise(&mut expected_rng);
+        let expected = 1.0
+            / (1.0 + (-((1.0 + first_noise / f64::MAX) - (-1.0 + second_noise / f64::MAX))).exp());
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+        let mask = relaxed_topk_gumbel(&[f64::MAX, -f64::MAX], 1, f64::MAX, 1.0, &mut rng);
+        assert!((mask[0] - expected).abs() < 1e-15);
+        assert!((mask[1] - (1.0 - expected)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn common_large_logit_offsets_preserve_gumbel_noise() {
+        let seed = 0xE57E_0007;
+        let mut baseline_rng = ChaCha8Rng::seed_from_u64(seed);
+        let baseline = gumbel_softmax(&[0.0, 0.0], 1.0, 1.0, &mut baseline_rng);
+        let mut offset_rng = ChaCha8Rng::seed_from_u64(seed);
+        let offset = gumbel_softmax(&[1e30, 1e30], 1.0, 1.0, &mut offset_rng);
+        assert_eq!(offset, baseline);
+
+        let mut baseline_rng = ChaCha8Rng::seed_from_u64(seed);
+        let baseline = relaxed_topk_gumbel(&[0.0, 0.0], 1, 1.0, 1.0, &mut baseline_rng);
+        let mut offset_rng = ChaCha8Rng::seed_from_u64(seed);
+        let offset = relaxed_topk_gumbel(&[1e30, 1e30], 1, 1.0, 1.0, &mut offset_rng);
+        assert_eq!(offset, baseline);
+    }
+
+    #[test]
+    fn relaxed_topk_extreme_finite_scores_stay_finite() {
+        let mut rng = ChaCha8Rng::seed_from_u64(0xE57E_0005);
+        let mask = relaxed_topk_gumbel(&[f64::MAX, 0.0, -f64::MAX], 1, 0.5, 2.0, &mut rng);
+
+        assert_eq!(mask, vec![1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn gumbel_topk_uses_noise_when_large_equal_f32_logits_round_together() {
+        let logits = [1e30_f32, 1e30_f32];
+        let mut observed = [false; 2];
+        for seed in 0..32 {
+            let mut expected_rng = ChaCha8Rng::seed_from_u64(seed);
+            let first_noise = gumbel_noise(&mut expected_rng);
+            let second_noise = gumbel_noise(&mut expected_rng);
+            let expected = if second_noise > first_noise { 1 } else { 0 };
+            observed[expected] = true;
+
+            let mut actual_rng = ChaCha8Rng::seed_from_u64(seed);
+            let actual = gumbel_topk_sample_with_rng(&logits, 1, &mut actual_rng);
+            assert_eq!(actual, vec![expected]);
+        }
+        assert!(observed.into_iter().all(|selected| selected));
     }
 
     #[test]

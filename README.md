@@ -52,6 +52,23 @@ differentiation. The kernel selectors require a dense `n × n` Gram matrix suppl
 by the caller. `kernel_thin` greedily minimizes MMD without replacement;
 `kernel_herd` can select an index more than once.
 
+For weighted choice from a slice:
+
+```rust
+use drawset::gumbel_topk_sample_with_rng;
+use rand::{rngs::StdRng, SeedableRng};
+
+let weights = [8.0_f32, 4.0, 2.0, 1.0];
+let logits: Vec<f32> = weights.iter().map(|weight| weight.ln()).collect();
+let mut rng = StdRng::seed_from_u64(42);
+let indices = gumbel_topk_sample_with_rng(&logits, 2, &mut rng);
+assert_eq!(indices.len(), 2);
+assert_ne!(indices[0], indices[1]);
+```
+
+Seeded results are repeatable with the same inputs, RNG, and library versions;
+exact samples are not a compatibility guarantee across releases.
+
 The crate also includes `NeighborSampler` for sampling a neighbor slice, plus
 quasi-Monte Carlo sequence re-exports from [lowdisc](https://crates.io/crates/lowdisc).
 See the [API documentation](https://docs.rs/drawset) for input requirements and

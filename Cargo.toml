@@ -10,7 +10,7 @@ homepage = "https://github.com/arclabs561/drawset"
 documentation = "https://docs.rs/drawset"
 keywords = ["sampling", "subset", "gumbel", "reservoir"]
 categories = ["algorithms", "science"]
-include = ["/src/**/*.rs", "/examples/**/*.rs", "/tests/**/*.rs", "/benches/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE-*", "/README.md"]
+include = ["/src/**/*.rs", "/examples/**/*.rs", "/examples/README.md", "/tests/**/*.rs", "/benches/**/*.rs", "/Cargo.toml", "/Cargo.lock", "/LICENSE", "/LICENSE-*", "/README.md", "/CONTRIBUTING.md", "/CHANGELOG.md"]
 
 [workspace]
 members = ["crates/kuji"]

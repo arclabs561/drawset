@@ -6,9 +6,6 @@
 //! # References
 //!
 //! - Hamilton et al. (2017): "Inductive Representation Learning on Large Graphs" (GraphSAGE)
-//! - Balaji et al. (2025): "Efficient GNN Training Through Structure-Aware Randomized
-//!   Mini-batching" -- community-aware sampling preserves local graph topology; a future
-//!   direction would combine this with `parti::Leiden` for structure-aware neighbor selection
 
 use rand::prelude::*;
 #[cfg(test)]
@@ -52,6 +49,10 @@ impl NeighborSampler {
 
     /// Set random seed for deterministic sampling.
     ///
+    /// Each sampling call restarts the RNG from this seed. Repeated calls with the
+    /// same inputs return the same sample; this is not a stateful random stream.
+    /// Exact sequences may change with the RNG or crate version.
+    ///
     /// # Examples
     ///
     /// ```
@@ -70,6 +71,9 @@ impl NeighborSampler {
     ///
     /// * `neighbors`: Slice of neighbor IDs
     /// * `k`: Number of samples to draw
+    ///
+    /// An empty input returns an empty vector. Otherwise returns `k` values,
+    /// sampling input positions uniformly, including positions with equal values.
     ///
     /// # Examples
     ///
@@ -105,6 +109,9 @@ impl NeighborSampler {
     /// Sample `k` neighbors uniformly without replacement.
     ///
     /// If `k >= neighbors.len()`, returns all neighbors (shuffled).
+    /// Sampling is without replacement of positions: equal input values can
+    /// appear more than once in the result. Empty input returns an empty vector.
+    /// The current implementation shuffles all indices, taking O(n) time and space.
     ///
     /// # Examples
     ///
@@ -143,7 +150,7 @@ impl NeighborSampler {
             None => Box::new(rand::rng()),
         };
 
-        // Reservoir sampling for indices
+        // Shuffle positions, preserving multiplicity of equal input values.
         let mut indices: Vec<usize> = (0..neighbors.len()).collect();
         indices.shuffle(&mut rng);
 
@@ -251,5 +258,27 @@ mod tests {
         // With 100 items and 50 samples, two different seeds producing identical output
         // is astronomically unlikely.
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn without_replacement_preserves_duplicate_positions() {
+        let sampler = NeighborSampler::new().with_seed(42);
+        let mut sample = sampler.sample_uniform_without_replacement(&[1, 1, 2], 3);
+        sample.sort_unstable();
+        assert_eq!(sample, [1, 1, 2]);
+    }
+
+    #[test]
+    fn seeded_calls_restart_the_random_stream() {
+        let sampler = NeighborSampler::new().with_seed(42);
+        let neighbors = [1, 2, 3, 4, 5];
+        assert_eq!(
+            sampler.sample_uniform_with_replacement(&neighbors, 8),
+            sampler.sample_uniform_with_replacement(&neighbors, 8)
+        );
+        assert_eq!(
+            sampler.sample_uniform_without_replacement(&neighbors, 3),
+            sampler.sample_uniform_without_replacement(&neighbors, 3)
+        );
     }
 }

@@ -20,7 +20,7 @@
 //! Notes:
 //! - This module provides `*_with_rng` entrypoints for deterministic testing/benchmarking.
 
-use rand::prelude::*;
+use rand::{distr::Open01, prelude::*};
 
 /// A reservoir sampler that maintains a uniform sample of size `k` from a stream.
 ///
@@ -116,9 +116,10 @@ impl<T> ReservoirSampler<T> {
             self.samples.push(item);
 
             if self.samples.len() == self.k {
-                // Initial weight for Algorithm L: W = exp(log(u) / k)
-                // Clamp away from 0 so W ∈ (0,1) and log(1 - W) stays finite/negative.
-                let u = rng.random::<f64>().max(f64::MIN_POSITIVE);
+                // Initial weight for Algorithm L: W = exp(log(u) / k). Open01
+                // avoids endpoint samples without introducing an arbitrary tail
+                // cutoff.
+                let u: f64 = rng.sample(Open01);
                 self.w = (u.ln() / self.k as f64).exp();
                 self.update_skip(rng);
             }
@@ -137,7 +138,7 @@ impl<T> ReservoirSampler<T> {
         self.samples[replace_idx] = item;
 
         // Update W and calculate new skip
-        let u = rng.random::<f64>().max(f64::MIN_POSITIVE);
+        let u: f64 = rng.sample(Open01);
         self.w *= (u.ln() / self.k as f64).exp();
         self.update_skip(rng);
     }
@@ -148,10 +149,13 @@ impl<T> ReservoirSampler<T> {
     /// S = floor(log(U) / log(1 - W))
     /// where U ~ Uniform(0,1) and W is the weight parameter.
     fn update_skip<R: Rng + ?Sized>(&mut self, rng: &mut R) {
-        let u = rng.random::<f64>();
-        // Avoid log(0) if w=1 (unlikely) or u=0
-        let denom = (1.0 - self.w).max(1e-10).ln();
-        let num = u.max(1e-10).ln();
+        let u: f64 = rng.sample(Open01);
+        // `ln_1p(-w)` preserves the small negative denominator when `w` is
+        // close to zero. If finite precision has rounded `w` to an endpoint,
+        // the resulting infinite skip count or zero skip is the limiting
+        // behavior rather than an arbitrary tail cutoff.
+        let denom = (-self.w).ln_1p();
+        let num = u.ln();
         let skip = (num / denom).floor();
         self.skip_counter = skip as usize;
     }
@@ -289,6 +293,10 @@ pub struct WeightedReservoirSampler<T> {
     seen: usize,
     items: Vec<T>,
     keys: Vec<f64>,
+    /// Finite comparison ranks for `keys`. `ln(u) / weight` can legitimately
+    /// overflow to `-inf` for subnormal positive weights, even though its
+    /// ordering is still well-defined.
+    ranks: Vec<f64>,
     /// Cached index of the minimum key. Avoids O(k) scan on every insertion
     /// after the reservoir is full; only rescanned when the min element is
     /// actually replaced.
@@ -303,6 +311,7 @@ impl<T> WeightedReservoirSampler<T> {
             seen: 0,
             items: Vec::with_capacity(k),
             keys: Vec::with_capacity(k),
+            ranks: Vec::with_capacity(k),
             min_idx: 0,
         }
     }
@@ -315,6 +324,10 @@ impl<T> WeightedReservoirSampler<T> {
     }
 
     /// Add a weighted item using a caller-supplied RNG.
+    ///
+    /// Every call is counted by [`Self::seen`], including calls rejected for an
+    /// invalid weight. A sampler with zero capacity discards the item before
+    /// validating its weight and does not consume the RNG.
     ///
     /// # Examples
     ///
@@ -348,29 +361,36 @@ impl<T> WeightedReservoirSampler<T> {
             return Err(WeightedReservoirError::NonPositiveWeight(weight));
         }
 
-        let u = rng.random::<f64>().max(f64::MIN_POSITIVE);
+        let u: f64 = rng.sample(Open01);
         // Comparing ln(u) / weight is equivalent to comparing u^(1/weight),
         // but does not collapse small positive weights to zero through exp
         // underflow.
         let key = u.ln() / weight;
+        // The public diagnostic key can still be `-inf` when the quotient
+        // underflows below f64's range. Compare its logarithmic magnitude
+        // instead: `weight.ln() - (-u.ln()).ln()` is a finite, monotonic
+        // transform of `ln(u) / weight` for every finite positive weight.
+        let rank = weight.ln() - (-u.ln()).ln();
 
         if self.items.len() < self.k {
             // Track min during the fill phase.
-            if self.keys.is_empty() || key < self.keys[self.min_idx] {
+            if self.ranks.is_empty() || rank < self.ranks[self.min_idx] {
                 self.min_idx = self.items.len();
             }
             self.items.push(item);
             self.keys.push(key);
+            self.ranks.push(rank);
             return Ok(());
         }
 
-        if key > self.keys[self.min_idx] {
+        if rank > self.ranks[self.min_idx] {
             self.items[self.min_idx] = item;
             self.keys[self.min_idx] = key;
+            self.ranks[self.min_idx] = rank;
             // Rescan for new min only when an element was replaced.
             self.min_idx = 0;
-            for (i, &k_i) in self.keys.iter().enumerate().skip(1) {
-                if k_i < self.keys[self.min_idx] {
+            for (i, &rank_i) in self.ranks.iter().enumerate().skip(1) {
+                if rank_i < self.ranks[self.min_idx] {
                     self.min_idx = i;
                 }
             }
@@ -385,11 +405,16 @@ impl<T> WeightedReservoirSampler<T> {
     }
 
     /// Log-keys (`ln(u) / weight`) for diagnostics/benchmarking.
+    ///
+    /// Very small positive weights can produce `-inf` because this diagnostic
+    /// representation exceeds `f64`'s finite range. Sampling still compares
+    /// those priorities using an equivalent finite representation.
     pub fn keys(&self) -> &[f64] {
         &self.keys
     }
 
-    /// Number of items observed so far.
+    /// Number of add attempts so far, including rejected invalid weights and
+    /// inputs discarded by a zero-capacity sampler.
     pub fn seen(&self) -> usize {
         self.seen
     }
@@ -415,6 +440,27 @@ mod tests {
 
         fn fill_bytes(&mut self, dest: &mut [u8]) {
             dest.fill(0);
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct FixedRng(u64);
+
+    impl rand::RngCore for FixedRng {
+        fn next_u32(&mut self) -> u32 {
+            self.0 as u32
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            self.0
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            for chunk in dest.chunks_mut(8) {
+                let bytes = self.0.to_le_bytes();
+                let len = chunk.len();
+                chunk.copy_from_slice(&bytes[..len]);
+            }
         }
     }
 
@@ -580,6 +626,45 @@ mod tests {
     }
 
     #[test]
+    fn weighted_reservoir_k_two_matches_sequential_draw_subset_law() {
+        let weights = [1.0, 2.0, 3.0];
+        let total_weight: f64 = weights.iter().sum();
+        let trials = 30_000;
+        let mut counts = [[0usize; 3]; 3];
+        let mut rng = ChaCha8Rng::seed_from_u64(0xA2E5_0002);
+
+        for _ in 0..trials {
+            let mut sampler = WeightedReservoirSampler::new(2);
+            for (item, &weight) in weights.iter().enumerate() {
+                sampler
+                    .add_with_rng(item, weight, &mut rng)
+                    .expect("weights are valid");
+            }
+
+            let mut subset = sampler.samples().to_vec();
+            subset.sort_unstable();
+            counts[subset[0]][subset[1]] += 1;
+        }
+
+        for first in 0..weights.len() {
+            for second in first + 1..weights.len() {
+                // The unordered probability is the sum of both sequential
+                // weighted draws without replacement: first then second, and
+                // second then first. A-Res has this same subset law.
+                let expected = weights[first] / total_weight * weights[second]
+                    / (total_weight - weights[first])
+                    + weights[second] / total_weight * weights[first]
+                        / (total_weight - weights[second]);
+                let observed = counts[first][second] as f64 / trials as f64;
+                assert!(
+                    (observed - expected).abs() < 0.02,
+                    "subset {{{first}, {second}}}: observed={observed:.5}, expected={expected:.5}, counts={counts:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn weighted_reservoir_preserves_tiny_weight_ratios() {
         let trials = 10_000;
         let mut counts = [0usize; 2];
@@ -604,6 +689,41 @@ mod tests {
     }
 
     #[test]
+    fn weighted_reservoir_orders_subnormal_weights_when_diagnostic_keys_overflow() {
+        let mut sampler = WeightedReservoirSampler::new(1);
+        let mut rng = ZeroRng;
+        let smallest = f64::from_bits(1);
+
+        sampler
+            .add_with_rng(0, smallest, &mut rng)
+            .expect("positive subnormal weight is valid");
+        sampler
+            .add_with_rng(1, f64::from_bits(2), &mut rng)
+            .expect("positive subnormal weight is valid");
+
+        // Both exposed log-keys are below f64's finite range, but their A-Res
+        // priorities differ: with equal u, the larger weight must win.
+        assert_eq!(sampler.keys(), &[f64::NEG_INFINITY]);
+        assert_eq!(sampler.samples(), &[1]);
+    }
+
+    #[test]
+    fn weighted_reservoir_seen_counts_attempts_before_validation() {
+        let mut sampler = WeightedReservoirSampler::new(1);
+        let mut rng = ChaCha8Rng::seed_from_u64(0);
+
+        assert!(sampler.add_with_rng(0, 0.0, &mut rng).is_err());
+        assert_eq!(sampler.seen(), 1);
+
+        let mut zero_capacity = WeightedReservoirSampler::new(0);
+        zero_capacity
+            .add_with_rng(0, f64::NAN, &mut rng)
+            .expect("zero-capacity sampler discards before validation");
+        assert_eq!(zero_capacity.seen(), 1);
+        assert!(zero_capacity.samples().is_empty());
+    }
+
+    #[test]
     fn reservoir_algorithm_l_handles_zero_rng_draws() {
         // Edge-case: some RNGs (or mocked RNGs) can yield an all-zero stream.
         // The implementation should not hit ln(0) or log(1 - W)=0 paths.
@@ -614,6 +734,20 @@ mod tests {
         }
         assert_eq!(s.samples().len(), 5);
         assert_eq!(s.seen(), 100);
+    }
+
+    #[test]
+    fn reservoir_algorithm_l_does_not_clamp_near_one_weight_tail() {
+        let mut sampler = ReservoirSampler::<()>::new(1);
+        sampler.w = 1.0 - 2f64.powi(-50);
+        // Open01 maps these bits to about 5.7e-14. The correct quotient is
+        // below one, while the former 1e-10 clamps made it one and
+        // incorrectly skipped an item.
+        let mut rng = FixedRng(1 << 20);
+
+        sampler.update_skip(&mut rng);
+
+        assert_eq!(sampler.skip_counter, 0);
     }
 
     // --- edge case tests ---
@@ -706,6 +840,25 @@ mod tests {
         // ---- A-Res cached min_idx is correct after every add ----
         proptest! {
             #[test]
+            fn prop_weighted_ranks_preserve_finite_log_key_order(
+                seed in any::<u64>(),
+                weights in proptest::collection::vec(0.01f64..100.0f64, 2..=20),
+            ) {
+                let mut sampler = WeightedReservoirSampler::new(weights.len());
+                let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+                for (item, &weight) in weights.iter().enumerate() {
+                    sampler.add_with_rng(item, weight, &mut rng).unwrap();
+                }
+
+                for (i, (&key_i, &rank_i)) in sampler.keys.iter().zip(&sampler.ranks).enumerate() {
+                    for (&key_j, &rank_j) in sampler.keys.iter().zip(&sampler.ranks).skip(i + 1) {
+                        prop_assert_eq!(key_i.total_cmp(&key_j), rank_i.total_cmp(&rank_j));
+                    }
+                }
+            }
+
+            #[test]
             fn prop_weighted_reservoir_min_idx_correct(
                 seed in 0u64..10_000,
                 k in 1usize..=10,
@@ -720,8 +873,8 @@ mod tests {
                     sampler.add_with_rng(i, w, &mut rng).unwrap();
 
                     // After each add, if the reservoir has items, min_idx should be correct.
-                    if !sampler.keys.is_empty() {
-                        let actual_min_idx = sampler.keys.iter()
+                    if !sampler.ranks.is_empty() {
+                        let actual_min_idx = sampler.ranks.iter()
                             .enumerate()
                             .min_by(|(_, a), (_, b)| a.total_cmp(b))
                             .unwrap()

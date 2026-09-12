@@ -8,7 +8,8 @@ For non-trivial work (new APIs, features, large refactors), open an issue first 
 
 ## Setup
 
-- Rust toolchain: stable, MSRV `1.75`. Use `rustup` to manage.
+- Use stable Rust for contributor checks. The library supports Rust `1.75`;
+  tests and benchmarks may require a newer toolchain for development dependencies.
 - Optional: `cargo-nextest` for faster test runs (`cargo install cargo-nextest`).
 
 ```
@@ -27,7 +28,8 @@ cargo test --workspace
 
 - `cargo test --workspace` includes library tests, integration tests, and doctests.
 - `just check` runs formatting, Clippy, and tests, using nextest when installed.
-  Run `cargo test --workspace --doc` separately when using nextest.
+  It also checks rustdoc links with all features enabled. Doctests run with
+  either test runner.
 - Test names should describe the property under test, not the function under test.
 
 ## Pull requests

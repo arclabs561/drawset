@@ -2,11 +2,5 @@
 /Cargo.lock
 .cursor/
 .agents/
-
-
-/clump/
-/knit/
-/pare/
-/kuji/
 proptest-regressions/
 /semver-checks/

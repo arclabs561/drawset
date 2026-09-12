@@ -33,16 +33,24 @@ jobs:
       - name: Build
         run: cargo build --workspace --all-targets
 
+      - name: Documentation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
+
       - name: Test
         run: cargo test --workspace
-      - name: run example assertions
-        run: cargo run --example streaming_reservoir
+      - name: Run examples
+        run: |
+          set -euo pipefail
+          cargo run --example distribution_demo
+          cargo run --example gumbel_softmax_demo
+          cargo run --example streaming_reservoir
+          cargo run --example weighted_topk
 
       - name: Semver check
         if: github.event_name == 'pull_request'
         run: |
-          cargo install cargo-semver-checks --locked || true
-          cargo semver-checks || echo "Skipping semver check until drawset has a crates.io baseline"
+          cargo install cargo-semver-checks --locked
+          cargo semver-checks --package drawset
 
   msrv:
     runs-on: ubuntu-latest
