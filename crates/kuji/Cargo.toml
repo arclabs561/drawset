@@ -13,7 +13,7 @@ categories = ["algorithms", "science"]
 readme = "README.md"
 
 [dependencies]
-drawset = { path = "../..", version = "0.1.0" }
+drawset = { path = "../..", version = "0.1.2" }
 
 [package.metadata.docs.rs]
 all-features = true

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Raised the `kuji` workspace bridge's drawset minimum to 0.1.2.
+
 ## [0.1.2] - 2026-09-12
 
 ### Fixed
