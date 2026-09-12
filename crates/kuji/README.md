@@ -4,8 +4,16 @@
 
 ```toml
 [dependencies]
-drawset = "0.1.0"
+drawset = "0.1.2"
 ```
 
-This compatibility crate re-exports `drawset` so existing users can migrate
-without changing call sites immediately.
+Use `drawset::` in new code. To switch the dependency while keeping existing
+`kuji::` imports, use Cargo's dependency alias:
+
+```toml
+[dependencies]
+kuji = { package = "drawset", version = "0.1.2" }
+```
+
+The published `kuji = "0.1.11"` compatibility crate also remains available and
+re-exports drawset. It has no independent implementation.

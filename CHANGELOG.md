@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-12
+
 ### Fixed
 
 - Removed a discarded selection pass from `kernel_thin`.

@@ -9,7 +9,7 @@ Sampling and subset-selection primitives.
 
 ```toml
 [dependencies]
-drawset = "0.1.1"
+drawset = "0.1.2"
 ```
 
 ```rust
