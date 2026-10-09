@@ -10,6 +10,7 @@
 //! - `qmc`: quasi-Monte Carlo sequences (Sobol, Halton, Owen-scrambled Sobol).
 //! - `thinning`: kernel thinning and herding (greedy coreset selection via MMD).
 
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
