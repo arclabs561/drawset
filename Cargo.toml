@@ -18,7 +18,7 @@ resolver = "2"
 
 [dependencies]
 lowdisc = "0.1"
-rand = "0.9"
+rand = "0.10"
 
 [package.metadata.docs.rs]
 all-features = true
