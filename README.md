@@ -5,6 +5,12 @@
 
 Sampling and subset-selection primitives.
 
+## Overview
+
+Keep a sample from a stream or select indices using weights. Start with the
+reservoir example below when the input size is unknown. The
+[sampler table](#choosing-a-sampler) covers weighted draws and kernel methods.
+
 ## Usage
 
 ```toml
@@ -53,6 +59,8 @@ by the caller. `kernel_thin` greedily minimizes MMD without replacement;
 `kernel_herd` can select an index more than once.
 
 For weighted choice from a slice:
+
+Add `rand = "0.9"` to your dependencies to choose a seed for this example.
 
 ```rust
 use drawset::gumbel_topk_sample_with_rng;
