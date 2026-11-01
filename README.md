@@ -58,9 +58,8 @@ differentiation. The kernel selectors require a dense `n × n` Gram matrix suppl
 by the caller. `kernel_thin` greedily minimizes MMD without replacement;
 `kernel_herd` can select an index more than once.
 
-For weighted choice from a slice:
-
-Add `rand = "0.9"` to your dependencies to choose a seed for this example.
+For weighted choice from a slice (this example also needs `rand = "0.9"` for
+the seeded RNG):
 
 ```rust
 use drawset::gumbel_topk_sample_with_rng;
@@ -82,18 +81,15 @@ quasi-Monte Carlo sequence re-exports from [lowdisc](https://crates.io/crates/lo
 See the [API documentation](https://docs.rs/drawset) for input requirements and
 algorithm references.
 
-## Examples and checks
+## Examples
 
 ```sh
 cargo run --example streaming_reservoir
 cargo run --example weighted_topk
 cargo run --example gumbel_softmax_demo
-cargo test --workspace
 ```
 
-More examples are listed in [examples/](examples/README.md). For local performance
-measurements, run `cargo bench --bench sampling`. Contributor checks are described
-in [CONTRIBUTING.md](CONTRIBUTING.md).
+More examples are listed in [examples/](examples/README.md).
 
 ## License
 
